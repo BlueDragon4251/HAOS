@@ -218,3 +218,37 @@ account dispatch with and without a ledger, root/agent denial, retained waits,
 uncertain-write release and grant-withdrawn source disposal. They run without
 Hermes source or optional SDK imports. Their policies and retained source bodies
 are fixtures, not live callback authentication or installed-owner acceptance.
+
+Private sealed-output uploads now have their own fixed interpreter/process path.
+The worker revalidates the exact retained canonical source, read grant, separate
+output approval, explicitly selected Robot mode, immutable output checksum and
+format before using the app token. Voice/video require their separate approvals.
+The actual pinned Hermes token helper and Stream SDK multipart builder are used.
+Only `oapi.dingtalk.com/media/upload` may receive the single exact multipart body;
+API credentials remain private and cookies/redirects are refused. Uploads carry
+bytes, never agent host paths. Strict bounded native `errcode`, resource type,
+media key and timestamp checks distinguish explicit refusal from an uncertain
+write. A returned private media key is not an outbound-message receipt.
+
+The reviewed upload formats follow the official
+[media upload API](https://open.dingtalk.com/document/orgapp/upload-media-files)
+and [Robot message types](https://open.dingtalk.com/document/orgapp/types-of-messages-sent-by-robots).
+HAOS additionally limits bytes, uses fixed path-free result names, checks declared
+format signatures and refuses known image/audio/video bytes disguised as a PDF.
+The private Robot voice path selects AMR-NB, which both interfaces document.
+
+AMR conversion uses `libopencore_amrnb` already present in the existing frozen
+PyAV runtime: no new package, lazy install, external program or cloud codec is
+introduced. The existing credential-free local speech identity now accepts one
+additional closed `amr` operation. It resamples bounded decoded mono audio to
+8 kHz, encodes fixed 12.2-kbit/s AMR-NB with DTX disabled, re-decodes and verifies
+complete frame duration. Source duration and encoded duration remain distinct in
+the source-bound receipt. Actual local Hermes ASR recognizes the converted
+reference. Gateway/controller Unix peers, socket trust, revocation, disconnect
+cleanup and long binary replies are exercised by the extended real-UID speech
+probe. These codec/RPC checks do not claim DingTalk delivery or device playback.
+
+Uploads and AMR conversion still require their per-part durable parent ledger,
+controller artifact handoff and actual Robot media-message connection before
+outgoing media is complete. Public registry/GUI activation remains gated on that
+work and the remaining owner/controller integration.

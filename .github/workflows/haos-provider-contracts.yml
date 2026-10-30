@@ -120,6 +120,7 @@ jobs:
           "$PYTHON" linux/haos/runtime/probe_dingtalk_compatibility.py linux/haos "$RUNNER_TEMP/provider-contracts/dingtalk-compatibility.json"
           "$PYTHON" linux/haos/runtime/probe_dingtalk_resource_lookup.py linux/haos "$RUNNER_TEMP/provider-contracts/dingtalk-resource-lookup.json"
           "$PYTHON" linux/haos/runtime/probe_dingtalk_reply.py linux/haos "$RUNNER_TEMP/provider-contracts/dingtalk-reply.json"
+          "$PYTHON" linux/haos/runtime/probe_dingtalk_upload.py linux/haos "$RUNNER_TEMP/provider-contracts/dingtalk-upload.json"
           "$PYTHON" linux/haos/runtime/probe_dingtalk_robot_reply.py linux/haos "$RUNNER_TEMP/provider-contracts/dingtalk-robot-reply.json"
           "$PYTHON" linux/haos/runtime/probe_dingtalk_ingress.py linux/haos "$RUNNER_TEMP/provider-contracts/dingtalk-ingress.json"
           "$PYTHON" linux/haos/runtime/probe_dingtalk_custody.py linux/haos "$RUNNER_TEMP/provider-contracts/dingtalk-custody.json"
@@ -205,6 +206,7 @@ jobs:
           OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 "$PYTHON" linux/haos/runtime/probe_email_voice.py linux/haos "$RUNNER_TEMP/haos-speech-fixture" "$RUNNER_TEMP/provider-contracts/email-voice.json"
           OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 "$PYTHON" linux/haos/runtime/probe_feishu_voice.py linux/haos "$RUNNER_TEMP/haos-speech-fixture" "$RUNNER_TEMP/provider-contracts/feishu-voice.json"
           "$PYTHON" linux/haos/runtime/probe_audio_opus.py linux/haos "$RUNNER_TEMP/haos-speech-fixture" "$RUNNER_TEMP/provider-contracts/audio-opus.json"
+          OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 "$PYTHON" linux/haos/runtime/probe_audio_amr.py linux/haos "$RUNNER_TEMP/haos-speech-fixture" "$RUNNER_TEMP/provider-contracts/audio-amr.json"
       - name: Verify real isolated speech UID socket activation offline native worker and disconnect cleanup
         run: |
           set -euo pipefail
@@ -384,6 +386,13 @@ jobs:
             python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
             python3 /probe.py > "$RUNNER_TEMP/provider-contracts/dingtalk-reply-worker-process.json"
           cat "$RUNNER_TEMP/provider-contracts/dingtalk-reply-worker-process.json"
+          docker run --rm --network none --security-opt no-new-privileges \
+            --pids-limit 128 --memory 1g -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
+            -v "$PWD/linux/haos/probes/probe_dingtalk_upload_process.py:/probe.py:ro" \
+            -e HAOS_DISPOSABLE_DINGTALK_UPLOAD_PROCESS=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/provider-contracts/dingtalk-upload-worker-process.json"
+          cat "$RUNNER_TEMP/provider-contracts/dingtalk-upload-worker-process.json"
           docker run --rm --network none --security-opt no-new-privileges \
             --pids-limit 128 --memory 1g -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
             -v "$PWD/linux/haos/probes/probe_dingtalk_reply_process.py:/probe.py:ro" \

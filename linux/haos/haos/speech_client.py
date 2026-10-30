@@ -44,11 +44,15 @@ async def opus(data,current):
     return await _exchange(data,current,operation='opus')
 
 
+async def amr(data,current):
+    return await _exchange(data,current,operation='amr')
+
+
 async def _exchange(data,current,operation=None):
     if not isinstance(data,bytes) or not 1<=len(data)<=MAX_AUDIO_BYTES or not callable(current):
         raise SpeechRefused('bounded approved audio bytes required')
     from .audio_opus import MAX_REPLY as OPUS_REPLY
-    reply_limit=OPUS_REPLY if operation=='opus' else 96*1024
+    reply_limit=OPUS_REPLY if operation in {'opus','amr'} else 96*1024
     current();trusted_endpoint()
     checksum=hashlib.sha256(data).hexdigest()
     async def exchange():
@@ -70,6 +74,9 @@ async def _exchange(data,current,operation=None):
                 raise SpeechRefused('local transcription unavailable; inspect local model and service status')
             if operation=='opus':
                 from .audio_opus import result as encoded_result
+                return encoded_result(reply['result'],checksum)
+            if operation=='amr':
+                from .audio_amr import result as encoded_result
                 return encoded_result(reply['result'],checksum)
             return result(reply['result'],checksum)
         finally:

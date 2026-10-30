@@ -70,6 +70,7 @@ test -x .venv/bin/hermes
 HAOS_SPEECH_FIXTURE="$(mktemp -d /tmp/haos-speech-fixture.XXXXXX)"
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/fetch_speech_fixture.py" /tmp/herald-os/linux/haos "$HAOS_SPEECH_FIXTURE"
 OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_speech_backend.py" /tmp/herald-os/linux/haos "$HAOS_SPEECH_FIXTURE" /usr/lib/haos/runtime-provenance/speech-native-build-probe.json
+OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_audio_amr.py" /tmp/herald-os/linux/haos "$HAOS_SPEECH_FIXTURE" /usr/lib/haos/runtime-provenance/audio-amr-build-probe.json
 OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_line_voice.py" /tmp/herald-os/linux/haos "$HAOS_SPEECH_FIXTURE" /usr/lib/haos/runtime-provenance/line-voice-build-probe.json
 OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_sms_voice.py" /tmp/herald-os/linux/haos "$HAOS_SPEECH_FIXTURE" /usr/lib/haos/runtime-provenance/sms-voice-build-probe.json
 OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_email_voice.py" /tmp/herald-os/linux/haos "$HAOS_SPEECH_FIXTURE" /usr/lib/haos/runtime-provenance/email-voice-build-probe.json
@@ -96,6 +97,7 @@ rm -rf -- "$HAOS_SPEECH_FIXTURE"
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_dingtalk_compatibility.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/dingtalk-compatibility-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_dingtalk_resource_lookup.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/dingtalk-resource-lookup-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_dingtalk_reply.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/dingtalk-reply-build-probe.json
+.venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_dingtalk_upload.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/dingtalk-upload-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_dingtalk_robot_reply.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/dingtalk-robot-reply-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_dingtalk_ingress.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/dingtalk-ingress-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_dingtalk_custody.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/dingtalk-custody-build-probe.json

@@ -20,7 +20,7 @@ _HASH=re.compile('[0-9a-f]{64}\\Z')
 
 
 def request_bytes(value):
-    if (not isinstance(value,dict) or set(value) not in ({'data','sha256'},{'data','sha256','operation'}) or 'operation' in value and value['operation']!='opus' or not isinstance(value['data'],str)
+    if (not isinstance(value,dict) or set(value) not in ({'data','sha256'},{'data','sha256','operation'}) or 'operation' in value and (not isinstance(value['operation'],str) or value['operation'] not in {'opus','amr'}) or not isinstance(value['data'],str)
             or not 1<=len(value['data'])<=MAX_AUDIO_BYTES*4//3+4
             or not isinstance(value['sha256'],str) or not _HASH.fullmatch(value['sha256'])):
         raise SpeechRefused('exact bounded audio bytes and checksum required')
@@ -46,6 +46,9 @@ def worker():
     if request.get('operation')=='opus':
         from .audio_opus import encode
         result=encode(data)
+    elif request.get('operation')=='amr':
+        from .audio_amr import encode
+        result=encode(data)
     else:result=transcribe(data)
     sys.stdout.write(json.dumps({'ok':True,'result':result})+'\n');sys.stdout.flush()
 
@@ -59,7 +62,7 @@ async def kill(process):
 
 async def invoke(request):
     from .audio_opus import MAX_REPLY as OPUS_REPLY
-    reply_limit=OPUS_REPLY if request.get('operation')=='opus' else MAX_REPLY
+    reply_limit=OPUS_REPLY if request.get('operation') in {'opus','amr'} else MAX_REPLY
     env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8','PYTHONDONTWRITEBYTECODE':'1',
         'HOME':'/var/lib/haos-speech','HERMES_HOME':'/etc/haos-speech',
         'PYTHONPATH':os.environ.get('PYTHONPATH','/usr/lib/haos:/usr/lib/haos/hermes'),'PYTHONSAFEPATH':'1',
