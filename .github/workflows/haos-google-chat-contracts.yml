@@ -168,7 +168,7 @@ jobs:
         run: |
           set -euo pipefail
           SDK_SITE="$PWD/upstream/hermes-agent/.venv/lib/python3.11/site-packages"
-          for MODE in removed rotated legacy; do
+          for MODE in removed rotated legacy unassociated; do
             docker run --rm --network none --security-opt no-new-privileges --pids-limit 128 --memory 1g \
               -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
               -v "$PWD/linux/haos/probes/probe_google_chat_file_process.py:/probe.py:ro" \

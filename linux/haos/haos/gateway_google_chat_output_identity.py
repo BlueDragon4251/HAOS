@@ -69,7 +69,7 @@ def backfill(inbox,policy,connector,account):
     from .gateway_google_chat import scope
     prepare(inbox);db=inbox.db
     if not db.execute("SELECT 1 FROM sqlite_master WHERE name='google_chat_output_files'").fetchone():return
-    rows=db.execute('SELECT * FROM google_chat_output_files ORDER BY created_at LIMIT 129').fetchall()
+    rows=db.execute("SELECT f.* FROM google_chat_output_files f LEFT JOIN google_chat_output_owners o ON o.file_id=f.id WHERE o.file_id IS NULL AND f.state!='purged' ORDER BY f.created_at LIMIT 129").fetchall()
     if len(rows)>128:raise Conflict('Google output custody exceeds existing bounded capacity')
     has_files=db.execute("SELECT 1 FROM sqlite_master WHERE name='google_chat_file_writes'").fetchone()
     if has_files:
@@ -105,7 +105,7 @@ def backfill_identity(inbox,account_scope):
     from .gateway_google_chat_files import FileLedger
     ledger=FileLedger(inbox)
     db.execute("CREATE INDEX IF NOT EXISTS google_chat_file_output_identity ON google_chat_file_writes(json_extract(proof,'$.file_id'),connector,account_scope)")
-    rows=db.execute('SELECT * FROM google_chat_output_files ORDER BY created_at LIMIT 129').fetchall()
+    rows=db.execute("SELECT f.* FROM google_chat_output_files f LEFT JOIN google_chat_output_owners o ON o.file_id=f.id WHERE o.file_id IS NULL AND f.state!='purged' ORDER BY f.created_at LIMIT 129").fetchall()
     if len(rows)>128:raise Conflict('Google output custody exceeds bounded capacity')
     for row in rows:
         indexed=db.execute('SELECT account_scope FROM google_chat_output_owners WHERE file_id=?',(row['id'],)).fetchone()

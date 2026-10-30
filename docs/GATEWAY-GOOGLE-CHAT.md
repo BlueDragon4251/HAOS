@@ -642,3 +642,19 @@ for those orphaned rows and missing legacy account identity, plus public GUI/CLI
 and production activation, remain in progress. The public count stays15/22.
 
 Exact-source checks: [output ownership, historical Root disposal and regression](evidence/2026-10-30/google-chat-private-output-ownership-validation.json).
+
+## Unassociated local output recovery
+
+Root can inspect and explicitly dispose of retained output bytes whose legacy
+records cannot prove an app association. This global recovery path acquires all
+Google profile leases and checks the actual current original output grants;
+it does not infer an account from a filename or require a service-account key.
+The decision binds the inspected snapshot, explicit confirmation and Owner note.
+An intervening proven association requires a fresh account-specific inspection.
+Audit and identity tombstones remain, and replay reuses the local receipt.
+No external deletion, backup or WAL erasure is claimed.
+
+Purged tombstones no longer consume the live output quota (128 files/48 MiB).
+A separate 65,536-record history bound preserves the audit limit. Inventories
+show retained bytes before purged history so older live files remain reachable.
+Public Google Chat setup and activation remain in progress; count stays 15/22.

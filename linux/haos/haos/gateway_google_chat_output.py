@@ -36,6 +36,12 @@ def sealed(data):
     finally:os.close(fd)
 
 
+def reserve_capacity(db,size):
+    if type(size) is not int or not 1<=size<=MAX_BYTES:raise ValueError('bounded Root output reservation required')
+    count,live,used=db.execute("SELECT COUNT(*),COALESCE(SUM(state!='purged'),0),COALESCE(SUM(length(data)),0) FROM google_chat_output_files").fetchone()
+    if count>=65536 or live>=128 or used+size>48*1024*1024:raise Conflict('Google output custody full; Owner recovery required')
+
+
 class Output:
     def __init__(self,adapter):
         self.adapter=adapter;self.db=adapter._haos_native.inbox.db;self.lock=asyncio.Lock()
@@ -148,8 +154,7 @@ class Output:
                             or previous['offer_id']!=offer['id'] or previous['size']!=offer['size'] or previous['sha256']!=offer['sha256'] or previous['filename']!=filename or previous['mime']!=mime or previous['data']!=b''):
                         raise Conflict('Google initial Root-byte identity changed; no restoration')
                 else:
-                    count,used=self.db.execute('SELECT COUNT(*),COALESCE(SUM(length(data)),0) FROM google_chat_output_files').fetchone()
-                    if count>=128 or used+offer['size']>48*1024*1024:raise Conflict('Google output custody full; Owner recovery required')
+                    reserve_capacity(self.db,offer['size'])
                     # The first byte identity is durable before fetching chunks.
                     # An interrupted Root-only read can resume that exact offer;
                     # purged/changed data cannot be restored. No Google I/O here.

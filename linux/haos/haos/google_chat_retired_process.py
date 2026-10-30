@@ -7,7 +7,7 @@ from .gateway_google_chat_identity import validate,account_scope
 from .gateway_google_chat_recovery import HEX,profile_name
 from .google_chat_owner_process import ERRORS,oauth_response,file_response,_snapshot,_name
 
-ACTIONS=frozenset({'profiles','tokens','revoke-token','quarantines','dispose-capsule','outputs','purge-output'})
+ACTIONS=frozenset({'profiles','tokens','revoke-token','quarantines','dispose-capsule','outputs','purge-output','unassociated-outputs','purge-unassociated-output'})
 
 
 def _public_config():
@@ -68,6 +68,12 @@ def response(value,action,*,request=None,policy=None):
     if set(value) in ({'error'},{'error','retry_after'}):
         if not isinstance(value['error'],str) or value['error'] not in ERRORS:raise ValueError('finite historical Google diagnostic required')
         if 'retry_after' in value and (type(value['retry_after']) is not int or not 0<=value['retry_after']<=86400):raise ValueError('bounded retry delay required')
+        return value
+    if action in {'unassociated-outputs','purge-unassociated-output'}:
+        if (set(value)!={'result','active_authorization_returned','app_association_inferred'}
+                or value['active_authorization_returned'] is not False or value['app_association_inferred'] is not False):
+            raise ValueError('global Owner cleanup cannot infer an app or return API authorization')
+        file_response(value['result'],'outputs' if action=='unassociated-outputs' else 'output-purge','',request=request)
         return value
     if action=='profiles':
         if (set(value)!={'profiles','identity_missing','history_truncated','network_requested','private_credentials_returned'}

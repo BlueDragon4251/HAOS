@@ -128,3 +128,58 @@ def test_historical_output_failed_owner_audit_commit_rolls_back_byte_disposal(re
     inbox.db.execute("CREATE TRIGGER fail_historical_audit BEFORE INSERT ON google_chat_output_owner_events BEGIN SELECT RAISE(ABORT,'fixture audit failure'); END")
     with pytest.raises(sqlite3.IntegrityError):purge_identity(inbox,None,identity,request,lambda:None)
     assert retained(recovery)['data']==before and retained(recovery)['state']=='retained' and not inbox.db.in_transaction
+
+
+
+def orphaned(rig):
+    inbox,*_=rig
+    inbox.db.execute('DELETE FROM google_chat_output_owners');inbox.db.execute('DELETE FROM google_chat_file_writes')
+    return inbox
+
+
+def test_unassociated_global_owner_view_never_invents_app_and_purge_needs_actual_original_grant_withdrawal(recovery):
+    from haos.gateway_google_chat_file_recovery import unassociated_outputs,purge_unassociated
+    from haos.google_chat_retired_process import response
+    inbox=orphaned(recovery);policy=recovery[4];before=retained(recovery)['data']
+    active=unassociated_outputs(inbox,policy,lambda:None)['outputs'][0]
+    assert active['current_grant'] and not active['purge_allowed']
+    with pytest.raises(PermissionError):purge_unassociated(inbox,policy,args(active),lambda:None)
+    view=unassociated_outputs(inbox,None,lambda:None);item=view['outputs'][0]
+    assert response({'result':view,'active_authorization_returned':False,'app_association_inferred':False},'unassociated-outputs')
+    assert retained(recovery)['data']==before
+    result=purge_unassociated(inbox,None,args(item),lambda:None)
+    assert purge_unassociated(inbox,None,args(item),lambda:None)==result
+    assert retained(recovery)['data']==b'' and owner(inbox,retained(recovery)) is None
+
+
+def test_output_that_acquires_proven_ownership_after_orphan_inspection_cannot_be_globally_purged(recovery):
+    from haos.gateway_google_chat_file_recovery import unassociated_outputs,purge_unassociated
+    inbox=orphaned(recovery);account=recovery[5];before=retained(recovery)['data']
+    view=unassociated_outputs(inbox,None,lambda:None)['outputs'][0]
+    retain(inbox,retained(recovery),'google',scope(account),'a'*64)
+    with pytest.raises(PermissionError):purge_unassociated(inbox,None,args(view),lambda:None)
+    assert retained(recovery)['data']==before
+
+
+def test_purged_tombstones_free_live_capacity_without_removing_history_or_allowing_more_than_128_live_outputs():
+    import sqlite3
+    from haos.gateway_google_chat_output import reserve_capacity
+    db=sqlite3.connect(':memory:');db.execute('CREATE TABLE google_chat_output_files(state TEXT,data BLOB)')
+    db.executemany('INSERT INTO google_chat_output_files VALUES(?,?)',[('purged',b'')]*128)
+    reserve_capacity(db,1024)
+    assert db.execute('SELECT COUNT(*) FROM google_chat_output_files').fetchone()[0]==128
+    db.executemany('INSERT INTO google_chat_output_files VALUES(?,?)',[('fetching',b'')]*128)
+    with pytest.raises(Conflict):reserve_capacity(db,1024)
+    db.execute("UPDATE google_chat_output_files SET state='purged' WHERE rowid=129")
+    reserve_capacity(db,1024)
+    db.close()
+
+
+def test_output_history_remains_bounded_even_after_byte_disposal():
+    import sqlite3
+    from haos.gateway_google_chat_output import reserve_capacity
+    db=sqlite3.connect(':memory:');db.execute('CREATE TABLE google_chat_output_files(state TEXT,data BLOB)')
+    db.executemany('INSERT INTO google_chat_output_files VALUES(?,?)',[('purged',b'')]*65536)
+    with pytest.raises(Conflict):reserve_capacity(db,1)
+    assert db.execute('SELECT COUNT(*) FROM google_chat_output_files').fetchone()[0]==65536
+    db.close()

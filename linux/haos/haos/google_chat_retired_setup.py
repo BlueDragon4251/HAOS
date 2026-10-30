@@ -116,3 +116,22 @@ def purge_output(account,row,note,*,confirmed=False):
         **{k:row[k] for k in ['id','snapshot_sha256','connector','ownership_sha256']},
         'owner_uid':int(os.environ.get('SUDO_UID','0')),'note_sha256':hashlib.sha256(note.strip().encode()).hexdigest(),'confirmed':True}
     return _invoke('purge-output',params)
+
+
+def unassociated_outputs():
+    from .initial_setup import require_root
+    require_root()
+    return _invoke('unassociated-outputs',{})
+
+
+def purge_unassociated_output(row,note,*,confirmed=False):
+    from .initial_setup import require_root
+    require_root()
+    from .gateway_google_chat_recovery import HEX
+    if (confirmed is not True or not isinstance(note,str) or not 1<=len(note.strip())<=2000 or not isinstance(row,dict)
+            or any(not isinstance(row.get(k),str) or not HEX.fullmatch(row[k]) for k in ['id','snapshot_sha256'])
+            or row.get('purge_allowed') is not True):
+        raise PermissionError('exakte unzugeordnete Ausgabe prüfen, ausdrücklich zur lokalen Bereinigung freigeben und begründen')
+    params={k:row[k] for k in ['id','snapshot_sha256']}
+    params.update(owner_uid=int(os.environ.get('SUDO_UID','0')),note_sha256=hashlib.sha256(note.strip().encode()).hexdigest(),confirmed=True)
+    return _invoke('purge-unassociated-output',params)

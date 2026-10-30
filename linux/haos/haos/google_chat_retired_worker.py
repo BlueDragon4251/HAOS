@@ -38,8 +38,13 @@ def main():
             or not isinstance(request['policy_sha256'],str) or not HEX.fullmatch(request['policy_sha256']) or not isinstance(request['params'],dict)):
         raise PermissionError('closed authenticated historical Google request required')
     action=request['action'];params=request['params']
-    if action=='profiles':
+    if action in {'profiles','unassociated-outputs'}:
         if params:raise ValueError('historical profile inventory takes no selector')
+    elif action=='purge-unassociated-output':
+        if (set(params)!={'id','snapshot_sha256','owner_uid','note_sha256','confirmed'} or params['confirmed'] is not True
+                or params['owner_uid']!=request['owner_uid']
+                or any(not isinstance(params[k],str) or not HEX.fullmatch(params[k]) for k in ['id','snapshot_sha256','note_sha256'])):
+            raise PermissionError('closed explicitly confirmed unassociated output decision required')
     elif action in {'tokens','quarantines','outputs'}:
         if set(params)!={'profile'}:raise ValueError('one exact historical profile required')
         profile_name(params['profile'])
@@ -57,7 +62,7 @@ def main():
         root_parent()
         if policy_snapshot()!=request['policy_sha256']:raise PermissionError('Root gateway policy changed during historical Owner action')
     from .redaction import Redactor
-    redactor=Redactor([]);lease=None;inbox=None
+    redactor=Redactor([]);lease=None;inbox=None;global_leases=[]
     import logging
     from .gateway_runtime import SafeFormatter
     handler=logging.StreamHandler();handler.setFormatter(SafeFormatter(redactor));logging.basicConfig(level=logging.WARNING,handlers=[handler],force=True)
@@ -68,7 +73,27 @@ def main():
         from .gateway_google_chat_identity import load,account_scope
         profiles=Path('/var/lib/haos-gateway/profiles')
         if profiles.exists():_directory(profiles)
-        if action=='profiles':
+        if action in {'unassociated-outputs','purge-unassociated-output'}:
+            # Unknown provenance cannot pick one app lease; require all bounded
+            # Google profile holders to be inactive before global Owner cleanup.
+            if profiles.exists():
+                for profile in profiles.iterdir():
+                    if not profile.name.startswith('google-chat-'):continue
+                    profile_name(profile.name);_directory(profile)
+                    if len(global_leases)>=128:raise Conflict('too many historical profiles for global cleanup; inspect individually')
+                    global_leases.append(acquire_lease(profile))
+            database=Path('/var/lib/haos-gateway/native-inbox.db')
+            if not database.exists():
+                if action!='unassociated-outputs':raise PermissionError('retained unassociated output required')
+                value={'outputs':[],'history_truncated':False,'network_requested':False,'private_bytes_returned':False}
+            else:
+                from .gateway_raw import NativeInbox
+                from .gateway_google_chat_file_recovery import unassociated_outputs,purge_unassociated
+                inbox=NativeInbox(database,redactor)
+                value=(unassociated_outputs(inbox,current_policy(),current) if action=='unassociated-outputs'
+                    else purge_unassociated(inbox,current_policy(),params,current))
+            result={'result':value,'active_authorization_returned':False,'app_association_inferred':False}
+        elif action=='profiles':
             rows=[];missing=[];count=0
             if profiles.exists():
                 for profile in sorted(profiles.iterdir(),key=lambda item:item.name):
@@ -143,6 +168,7 @@ def main():
     finally:
         if inbox is not None:inbox.close()
         if lease is not None:os.close(lease)
+        for held in global_leases:os.close(held)
 
 
 if __name__=='__main__':main()
