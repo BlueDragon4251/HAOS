@@ -250,3 +250,67 @@ class OAuthForm:
             self.wizard.status.configure(text=('Google bestätigt den Widerruf; privater Prüfbeleg gespeichert.' if value['remote_revocation_verified'] else
                 'Lokale Nutzung gesperrt; entfernter Widerruf nicht bestätigt: '+value['remote_status']+'. Status und Wartezeit prüfen.'))
         self.submit(action,execute,accepted=accepted)
+
+
+class FileRecoveryForm(RecoveryForm):
+    """Payload-free file decisions with the same asynchronous stale-result guard."""
+    def __init__(self,wizard,parent,connector):
+        self.wizard=wizard;self.connector=connector;self.rows=[];self.kind=None;self.epoch=0;self.loaded_connector=None;self.confirm_connector=None;tk=wizard.tk
+        self.frame=tk.Frame(parent,bg=wizard.PANEL);self.buttons={}
+        wizard._label(self.frame,'Google Chat: Dateiversand prüfen und wiederherstellen',size=12).pack(anchor='w',pady=5)
+        self.buttons['files']=self.button('Dateioperationen ohne Nutzdaten prüfen',lambda:self.load('files'))
+        self.buttons['outputs']=self.button('Lokale Dateikopien ohne Nutzdaten prüfen',lambda:self.load('outputs'))
+        self.list=tk.Listbox(self.frame,height=6,exportselection=False,bg=wizard.BG,fg=wizard.TEXT);self.list.pack(fill='x',pady=4)
+        self.list.bind('<<ListboxSelect>>',self.selected)
+        self.details=tk.Text(self.frame,height=7,wrap='word',bg=wizard.BG,fg=wizard.TEXT,state='disabled');self.details.pack(fill='x',pady=4)
+        self.note=wizard._field(self.frame,'Nicht geheime Prüfbegründung (keine Zugangsdaten)')
+        self.confirm=tk.BooleanVar(value=False);self.not_delivered=tk.BooleanVar(value=False)
+        self.confirm.trace_add('write',lambda *_:setattr(self,'confirm_connector',self.connector() if self.confirm.get() else None))
+        self.flag('Genau diesen aktuellen Beleg geprüft und diese Aktion ausdrücklich freigegeben',self.confirm)
+        self.flag('Genau diese Dateinachricht nach unabhängiger Prüfung sicher nicht zugestellt; ein GET404 allein genügt nicht',self.not_delivered)
+        self.buttons['upload']=self.button('Genau diesen unklaren Upload einmal freigeben',lambda:self.perform_file('retry-upload'))
+        self.buttons['retry']=self.button('Genau diese unbestätigte Dateinachricht einmal freigeben',lambda:self.perform_file('retry-file'))
+        self.buttons['purge']=self.button('Genau diese lokale Dateikopie nach Freigabeentzug entsorgen',lambda:self.perform_file('output-purge'))
+        wizard._label(self.frame,'Diese Entscheidungen senden nichts und ersetzen keine getrennte Controller-Recovery. '
+            'Eine Uploadfreigabe gilt nur, solange noch kein Nachrichtenversand begonnen wurde. Die gleiche Datei und derselbe Nutzer bleiben gebunden. '
+            'Vor einem freigegebenen Neuversand wird verspätete Annahme unter derselben Nachrichten-ID geprüft; '
+            'auch eine abgebrochene Prüfung verbraucht die Freigabe. Bestätigte Nachrichten werden nicht neu versendet. '
+            'Entsorgung entfernt nur die gewählte lokale Dateikopie nach Entzug ihrer alten Freigabe. '
+            'Google-Kopien, andere lokale Kopien, Prüfbelege, Backups und WAL werden damit nicht sicher gelöscht. '
+            'Die Prüfung stoppt den Gateway-Dienst; anschließend bewusst wieder starten.',size=10,color=wizard.MUTED).pack(anchor='w',pady=5)
+
+    def load(self,kind):
+        connector=self.connector();self.clear();epoch=self.epoch
+        def show(value):
+            if not self.fresh(epoch,connector):return
+            try:value=response(value,kind,connector)
+            except (ValueError,TypeError,KeyError):self.clear();self.wizard.status.configure(text='Ungültigen oder privaten Datei-Prüfbeleg verworfen.');return
+            if 'error' in value:self.wizard.status.configure(text=ERRORS[value['error']]);return
+            self.kind=kind;self.loaded_connector=connector;self.rows=deepcopy(value[kind])
+            for row in self.rows:self.list.insert(self.wizard.tk.END,row['filename']+' · '+row['state']+(' · '+row['upload_state'] if kind=='files' else '')+' · '+row['id'][:12])
+            self.wizard.status.configure(text='Dateibelege ohne Inhalte oder Zugangsdaten geladen. Genau eine Zeile auswählen.')
+        self.wizard._run_async(lambda:owner.inspect(connector,kind),result_handler=show)
+
+    def perform_file(self,action):
+        if self.wizard.running:return
+        kind='outputs' if action=='output-purge' else 'files'
+        try:
+            row=self.choice(kind);note=self.note.get().strip();confirmed=self.confirm.get();independent=self.not_delivered.get()
+            if not confirmed or self.confirm_connector!=self.connector() or not 1<=len(note)<=2000:raise ValueError('Aktuellen Beleg ausdrücklich bestätigen und nicht geheime Prüfbegründung angeben.')
+            field={'retry-upload':'upload_retry_allowed','retry-file':'file_retry_allowed','output-purge':'purge_allowed'}[action]
+            if row.get(field) is not True:raise ValueError('Dieser Beleg erlaubt die gewählte Aktion nicht. Freigabe, Quellbeleg, Zustand und Retry-Grenze prüfen.')
+            if action=='retry-file' and independent is not True:raise ValueError('Nichtzustellung dieser Dateinachricht unabhängig prüfen und ausdrücklich bestätigen.')
+        except ValueError as error:self.wizard.status.configure(text=str(error));return
+        connector=self.connector();epoch=self.epoch;self.confirm.set(False);self.not_delivered.set(False);self.note.delete(0,self.wizard.tk.END)
+        backend_action='output-purge' if action=='output-purge' else 'file-decide'
+        def execute():
+            if action=='output-purge':return owner.output_purge(connector,row,note,confirmed=True)
+            return owner.file_retry(connector,row,action,note,confirmed=True,confirmed_not_delivered=action=='retry-file' and independent)
+        def finished(value):
+            if not self.fresh(epoch,connector):return
+            try:value=response(value,backend_action,connector,request={'id':row['id'],'action':action})
+            except (ValueError,TypeError,KeyError):self.clear();self.wizard.status.configure(text='Ungültigen Datei-Entscheidungsbeleg verworfen. Zustand neu prüfen.');return
+            self.clear();self.wizard.status.configure(text=ERRORS[value['error']] if 'error' in value else
+                'Lokale Dateikopie entsorgt; keine entfernte Löschung bestätigt.' if action=='output-purge' else
+                'Begrenzte Owner-Entscheidung gespeichert; kein Versand. Getrennte Controller-Recovery ausdrücklich prüfen.')
+        self.wizard._run_async(execute,result_handler=finished)

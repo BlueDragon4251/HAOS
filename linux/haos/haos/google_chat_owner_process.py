@@ -9,7 +9,7 @@ from .gateway_google_chat import resource
 from .gateway_google_chat_recovery import HEX,profile_name
 
 ERRORS=frozenset({'authority-refused','storage-unavailable','runtime-unavailable','authentication-refused','rate-limited','identity-refused','transport-unavailable'})
-ACTIONS=frozenset({'source-profiles','sources','outgoing','purge-source','approve-retry','retry-auth','oauth-begin','oauth-finish','oauth-sessions','oauth-tokens','oauth-revoke','oauth-quarantines','oauth-dispose'})
+ACTIONS=frozenset({'source-profiles','sources','outgoing','purge-source','approve-retry','retry-auth','oauth-begin','oauth-finish','oauth-sessions','oauth-tokens','oauth-revoke','oauth-quarantines','oauth-dispose','files','outputs','file-decide','output-purge'})
 NAME=re.compile('[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}\\Z')
 
 
@@ -38,6 +38,7 @@ def response(value,action,connector,*,request=None):
         if 'retry_after' in value and (type(value['retry_after']) is not int or not 0<=value['retry_after']<=86400):raise ValueError('bounded private OAuth retry delay required')
         return value
     if action.startswith('oauth-'):return oauth_response(value,action,connector,request=request)
+    if action in {'files','outputs','file-decide','output-purge'}:return file_response(value,action,connector,request=request)
     if value.get('network_requested') is not False:raise ValueError('Google Chat recovery action cannot request network I/O')
     if action in {'source-profiles','sources','outgoing'}:
         key='profiles' if action=='source-profiles' else action
@@ -198,4 +199,71 @@ def oauth_response(value,action,connector,*,request=None):
                 or (value['locally_revoked'] is not True if action=='oauth-revoke' else value['api_use_authorized'] is not False)):
             raise ValueError('closed Google local/remote withdrawal receipt required')
     else:raise ValueError('unsupported private Google OAuth response')
+    return value
+
+
+
+def file_response(value,action,connector,*,request=None):
+    if value.get('network_requested') is not False:raise ValueError('offline Google file Owner decision required')
+    if action in {'files','outputs'}:
+        if (set(value)!={action,'history_truncated','network_requested','private_bytes_returned'} or value['private_bytes_returned'] is not False
+                or type(value['history_truncated']) is not bool or not isinstance(value[action],list) or len(value[action])>64):
+            raise ValueError('closed bounded payload-free Google file inventory required')
+        for row in value[action]:
+            if not isinstance(row,dict):raise ValueError('closed public Google file metadata required')
+            if action=='files':
+                fields={'id','client_id','request_id','upload_state','state','receipt','created_at','owner_retry_generation','upload_retry_generation',
+                    'connector','account_scope','binding_id','binding_digest','subject','chat','thread','delivery_id','source_id','file_id','file_sha256',
+                    'filename','mime','proof_sha256','caption_sha256','caption_bytes','upload_ref_sha256','current_grant','current_account','source_projection_available',
+                    'output_available','upload_retry_allowed','file_retry_allowed','private_bytes_returned','recipient_read_verified','snapshot_sha256'}
+                if (set(row)!=fields or row['connector']!=connector or any(not _hash(row[k]) for k in ['id','binding_digest','delivery_id','file_id','file_sha256','proof_sha256','caption_sha256','upload_ref_sha256'])
+                        or not _name(row['binding_id']) or not isinstance(row['account_scope'],str) or not re.fullmatch('google-chat:[a-f0-9]{64}',row['account_scope'])
+                        or row['client_id']!='client-'+row['id'][:56] or type(row['owner_retry_generation']) is not int or not 0<=row['owner_retry_generation']<=4
+                        or type(row['upload_retry_generation']) is not int or not 0<=row['upload_retry_generation']<=2
+                        or row['upload_state'] not in {'not-started','uploading','uploaded','retry-approved'} or row['state'] not in {'prepared','writing','confirmed','owner-retry-approved'}
+                        or type(row['caption_bytes']) is not int or not 0<=row['caption_bytes']<=16384
+                        or any(type(row[k]) is not bool for k in ['current_grant','current_account','source_projection_available','output_available','upload_retry_allowed','file_retry_allowed'])
+                        or row['private_bytes_returned'] is not False or row['recipient_read_verified'] is not False):raise ValueError('closed inspected Google file-write metadata required')
+                import uuid
+                if row['request_id']!=str(uuid.uuid5(uuid.NAMESPACE_URL,'haos-google-file:'+row['id'])):raise ValueError('stable Google file request identity required')
+                resource(row['subject'],'user');resource(row['chat'],'space');resource(row['source_id'],'message',space=row['chat'])
+                if row['thread']:resource(row['thread'],'thread',space=row['chat'])
+                if (row['state']=='confirmed')!=bool(row['receipt']):raise ValueError('exact Google file receipt state required')
+                if row['receipt']:resource(row['receipt'],'message',space=row['chat'])
+                eligible=row['current_grant'] and row['current_account'] and row['source_projection_available'] and row['output_available']
+                if (row['upload_retry_allowed']!=(eligible and row['state']=='prepared' and row['upload_state']=='uploading' and row['upload_retry_generation']<2)
+                        or row['file_retry_allowed']!=(eligible and row['state']=='writing' and row['owner_retry_generation']<4)):
+                    raise ValueError('exact current bounded Google file retry eligibility required')
+            else:
+                fields={'id','delivery_id','binding_id','binding_digest','filename','mime','size','created_at','expected_sha256','actual_sha256','stored_bytes','state',
+                    'current_grant','purge_allowed','private_bytes_returned','remote_deletion_verified','other_copies_backups_and_WAL_erasure_not_claimed','snapshot_sha256'}
+                if (set(row)!=fields or any(not _hash(row[k]) for k in ['id','delivery_id','binding_digest','expected_sha256'])
+                        or row['actual_sha256'] is not None and not _hash(row['actual_sha256']) or not _name(row['binding_id'])
+                        or row['state'] not in {'fetching','retained','purged','damaged'} or type(row['size']) is not int or not 1<=row['size']<=8*1024*1024
+                        or type(row['stored_bytes']) is not int or not 0<=row['stored_bytes']<=8*1024*1024
+                        or type(row['current_grant']) is not bool or type(row['purge_allowed']) is not bool
+                        or row['purge_allowed']!=(not row['current_grant'] and row['state']!='purged') or row['private_bytes_returned'] is not False
+                        or row['remote_deletion_verified'] is not False or row['other_copies_backups_and_WAL_erasure_not_claimed'] is not True):
+                    raise ValueError('closed local Google output disposal metadata required')
+            if (not isinstance(row['filename'],str) or not re.fullmatch('result-[0-9]{1,6}\\.[a-z0-9]{1,10}',row['filename'])
+                    or not isinstance(row['mime'],str) or len(row['mime'])>128 or not re.fullmatch('[a-z0-9.+-]+/[a-z0-9.+-]+',row['mime'])
+                    or type(row['created_at']) not in {int,float} or not math.isfinite(row['created_at']) or not 0<row['created_at']<=253402300799):
+                raise ValueError('bounded public Google file descriptor/time required')
+            _snapshot(row)
+    elif action=='file-decide':
+        if (set(value)!={'id','action','generation','receipt','approval_recorded','network_requested','message_sent','same_source_user_file_and_stable_ids_required','late_acceptance_check_before_create_required'}
+                or any(not _hash(value[k]) for k in ['id','receipt']) or value['action'] not in {'retry-upload','retry-file'}
+                or type(value['generation']) is not int or not 1<=value['generation']<=(2 if value['action']=='retry-upload' else 4)
+                or value['approval_recorded'] is not True or value['message_sent'] is not False or value['same_source_user_file_and_stable_ids_required'] is not True
+                or type(value['late_acceptance_check_before_create_required']) is not bool
+                or value['late_acceptance_check_before_create_required']!=(value['action']=='retry-file')):raise ValueError('closed offline Google file approval receipt required')
+    elif action=='output-purge':
+        if (set(value)!={'id','receipt','network_requested','message_sent','tombstones_retained','remote_deletion_verified','other_copies_backups_and_WAL_erasure_not_claimed'}
+                or any(not _hash(value[k]) for k in ['id','receipt']) or value['message_sent'] is not False or value['tombstones_retained'] is not True
+                or value['remote_deletion_verified'] is not False or value['other_copies_backups_and_WAL_erasure_not_claimed'] is not True):
+            raise ValueError('closed local Google file disposal receipt required')
+    else:raise ValueError('unsupported offline Google file action')
+    if request is not None and action in {'file-decide','output-purge'}:
+        if value['id']!=request['id'] or action=='file-decide' and value['action']!=request['action']:
+            raise ValueError('Google file decision differs from selected Root action or snapshot identity')
     return value

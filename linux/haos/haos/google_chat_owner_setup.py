@@ -94,7 +94,7 @@ def _invoke(connector,action,params):
 def inspect(connector,action='outgoing',*,profile=None):
     from .initial_setup import require_root
     require_root()
-    if not isinstance(action,str) or action not in {'source-profiles','sources','outgoing'}:raise ValueError('closed no-network Google Chat inspection required')
+    if not isinstance(action,str) or action not in {'source-profiles','sources','outgoing','files','outputs'}:raise ValueError('closed no-network Google Chat inspection required')
     params={}
     if action=='sources':
         from .gateway_google_chat_recovery import profile_name
@@ -182,3 +182,24 @@ def oauth_dispose(connector,row,note,*,confirmed=False):
     if not isinstance(row,dict) or any(not isinstance(row.get(k),str) or not HEX.fullmatch(row[k]) for k in ['id','snapshot_sha256']):
         raise PermissionError('exact inspected rejected Google credential capsule required')
     return _invoke(connector,'oauth-dispose',dict(params,id=row['id'],snapshot_sha256=row['snapshot_sha256']))
+
+
+
+def file_retry(connector,row,action,note,*,confirmed=False,confirmed_not_delivered=False):
+    params=_decision(note,confirmed)
+    from .gateway_google_chat_files import HEX
+    if (not isinstance(action,str) or action not in {'retry-upload','retry-file'} or type(confirmed_not_delivered) is not bool
+            or confirmed_not_delivered!=(action=='retry-file') or not isinstance(row,dict)
+            or row.get('connector')!=connector or any(not isinstance(row.get(k),str) or not HEX.fullmatch(row[k]) for k in ['id','snapshot_sha256'])
+            or row.get('upload_retry_allowed' if action=='retry-upload' else 'file_retry_allowed') is not True):
+        raise PermissionError('exact inspected eligible Google file decision and independent non-delivery confirmation required')
+    return _invoke(connector,'file-decide',dict(params,id=row['id'],snapshot_sha256=row['snapshot_sha256'],action=action,confirmed_not_delivered=confirmed_not_delivered))
+
+
+def output_purge(connector,row,note,*,confirmed=False):
+    params=_decision(note,confirmed)
+    from .gateway_google_chat_files import HEX
+    if (not isinstance(row,dict) or row.get('purge_allowed') is not True
+            or any(not isinstance(row.get(k),str) or not HEX.fullmatch(row[k]) for k in ['id','snapshot_sha256'])):
+        raise PermissionError('exact inspected withdrawn Google output snapshot required')
+    return _invoke(connector,'output-purge',dict(params,id=row['id'],snapshot_sha256=row['snapshot_sha256']))

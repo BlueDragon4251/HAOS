@@ -407,3 +407,37 @@ unclear upload. The public software count remains15/22.
 Exact-source checks: [native files and source-bound publisher components](evidence/2026-10-30/google-chat-private-native-files-validation.json).
 Previous-source Owner OAuth CI is separately pinned:
 [b3c975b CI](evidence/2026-10-30/google-chat-private-owner-oauth-ci-status.json).
+
+Prepared Owner file recovery now inspects only bounded file/source/output
+metadata. It separately proves the current original grant, unchanged app
+credentials, committed native/parent source projection, original raw custody
+and retained Root output bytes before allowing any retry. Upload recovery is
+limited to two explicit attempts while no message create has begun. Publication
+recovery is limited to four explicit independent non-delivery decisions. Each
+snapshot-bound decision is audited and idempotent; replaying an old decision
+never rearms a consumed attempt.
+
+A publication permission is durably moved to `reconciling` before its own-ID GET,
+not after it. The same live attempt receives a private opaque lookup object. A
+GET404 can consume that object once and commit `consumed` before the unchanged
+native create. GET200 instead confirms late acceptance without another POST.
+An interrupted lookup, malformed JSON or receipt mismatch leaves no standing
+permission for automatic create after reopen. IDs, uploaded reference, file
+bytes, principal, source and thread remain fixed. Failed audit/receipt commits
+roll back phase changes and preserve uncertainty. Legacy file journals add the
+new upload retry generation without discarding existing unknown/confirmed rows.
+
+The fixed Root/private worker now provides offline file/output inspection,
+bounded retry decisions and exact-snapshot local output disposal. The prepared
+Tk file component requires current selection, a nonsecret note, explicit
+consent and separate independent non-delivery confirmation for publication. It
+invalidates old selections and rejects private or mismatched response fields
+before rendering. These decisions do not send anything or replace the separate
+controller outbox recovery. Local disposal requires withdrawal of the original
+output grant, keeps tombstones/audit and makes no remote Google deletion or
+other-copy/backup/WAL erasure claim. Historical output/account association after
+credential removal remains part of public management integration.
+
+Exact-source checks: [offline file decisions, private SDK restarts and Tk component](evidence/2026-10-30/google-chat-private-file-recovery-validation.json).
+Previous-source native-file CI is separately pinned:
+[5d67f38 CI](evidence/2026-10-30/google-chat-private-native-files-ci-status.json).

@@ -69,6 +69,8 @@ except PermissionError:print(json.dumps({'error':'root-backend-authority-refused
         return json.loads(result.stdout)
     cases=[]
     assert call('inspect',{'action':'outgoing'})=={'outgoing':[],'history_truncated':False,'network_requested':False,'private_bytes_returned':False}
+    for kind in ['files','outputs']:
+        assert call('inspect',{'action':kind})=={kind:[],'history_truncated':False,'network_requested':False,'private_bytes_returned':False}
     assert not (state/'native-inbox.db').exists()
     cases.append('actual_fixed_installed_Root_backend_passes_closed_stdin_to_live_Root_parent_private_UID_worker_and_empty_inspection_does_not_create_native_journal_or_import_optional_SDK')
     for uid,gid,groups in [(0,0,[]),(65533,65533,[]),(65534,65534,[0])]:
@@ -81,7 +83,7 @@ except PermissionError:print(json.dumps({'error':'root-backend-authority-refused
     foreign='''import subprocess,sys
 from haos.google_chat_owner_process import command
 from haos import google_chat_owner_setup as owner
-for action in [lambda:owner.inspect('google'),lambda:owner.retry_auth('google','fixture',confirmed=True),lambda:owner.purge_source('google',{},'fixture',confirmed=True),lambda:owner.approve_reply('google',{},'a'*64,'fixture',confirmed=True,confirmed_not_delivered=True)]:
+for action in [lambda:owner.inspect('google'),lambda:owner.retry_auth('google','fixture',confirmed=True),lambda:owner.purge_source('google',{},'fixture',confirmed=True),lambda:owner.approve_reply('google',{},'a'*64,'fixture',confirmed=True,confirmed_not_delivered=True),lambda:owner.file_retry('google',{},'retry-file','fixture',confirmed=True,confirmed_not_delivered=True),lambda:owner.output_purge('google',{},'fixture',confirmed=True)]:
  try:action()
  except PermissionError:pass
  else:raise AssertionError('private UID gained Root backend')

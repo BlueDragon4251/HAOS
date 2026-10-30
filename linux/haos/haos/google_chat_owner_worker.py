@@ -27,6 +27,7 @@ def main():
     resource.setrlimit(resource.RLIMIT_AS,(768*1024*1024,768*1024*1024));signal.signal(signal.SIGALRM,lambda *_:os._exit(124));signal.alarm(40)
     from .gateway_line_ingress import _object
     from .gateway_dingtalk_admission import finite
+    from .gateway import Conflict
     from .gateway_google_chat import credentials,authority,PreparedGoogleChatPolicy,scope
     from .gateway_google_chat_recovery import HEX,profile_name
     from .google_chat_owner_process import ACTIONS,response
@@ -41,7 +42,7 @@ def main():
             or type(request['owner_uid']) is not int or not 0<=request['owner_uid']<2**32-1 or not isinstance(request['params'],dict)):
         raise PermissionError('closed authenticated private Google Chat Owner action required')
     action=request['action'];params=request['params'];connector=request['connector'];value=credentials(request['credentials'])
-    if action in {'source-profiles','outgoing','oauth-sessions','oauth-tokens','oauth-quarantines'}:
+    if action in {'source-profiles','outgoing','oauth-sessions','oauth-tokens','oauth-quarantines','files','outputs'}:
         if params:raise ValueError('Google Chat inventory takes no implicit selector')
     elif action=='sources':
         if set(params)!={'profile'}:raise ValueError('one exact Google Chat source profile required')
@@ -85,7 +86,7 @@ def main():
             from .gateway_google_chat_oauth_tokens import TokenVault
             database=profile/'user-oauth.sqlite' if profile is not None else None
             if database is None or not database.exists() and action!='oauth-begin':
-                if action not in {'oauth-sessions','oauth-tokens','oauth-quarantines'}:raise PermissionError('retained private OAuth profile required')
+                if action not in {'oauth-sessions','oauth-tokens','oauth-quarantines','files','outputs'}:raise PermissionError('retained private OAuth profile required')
                 key={'oauth-sessions':'sessions','oauth-tokens':'tokens','oauth-quarantines':'quarantines'}[action]
                 result={key:[],'history_truncated':False,'network_requested':False,'private_bytes_returned' if key=='sessions' else 'private_credentials_returned':False}
             else:
@@ -128,6 +129,22 @@ def main():
                         profile_name(path.name);_directory(path);names.append(path.name)
                         if len(names)>65536:raise ValueError('Google Chat profile history exceeds bound')
             result={'profiles':sorted(names)[:128],'history_truncated':len(names)>128,'network_requested':False,'private_bytes_returned':False}
+        elif action in {'files','outputs','file-decide','output-purge'}:
+            from .gateway_raw import NativeInbox
+            from .gateway_google_chat_file_recovery import inventory,outputs,decide,purge
+            database=Path('/var/lib/haos-gateway/native-inbox.db')
+            if not database.exists():
+                if action not in {'files','outputs'}:raise PermissionError('retained Google file journal required')
+                result={action:[],'history_truncated':False,'network_requested':False,'private_bytes_returned':False}
+            else:
+                inbox=NativeInbox(database,redactor)
+                if profile is not None and (profile/'originals.sqlite').exists():
+                    from .gateway_google_chat_custody import Originals
+                    store=Originals(profile/'originals.sqlite',redactor)
+                if action=='files':result=inventory(inbox,current(),connector,value,current,originals=store)
+                elif action=='outputs':result=outputs(inbox,current(),connector,value,current)
+                elif action=='file-decide':result=decide(inbox,current(),connector,value,params,current,originals=store)
+                else:result=purge(inbox,current(),connector,value,params,current)
         elif action in {'sources','purge-source'}:
             from .gateway_google_chat_custody import Originals
             from .gateway_google_chat_recovery import sources,purge_source
@@ -157,6 +174,7 @@ def main():
         from .gateway_google_chat_oauth_tokens import Deferred
         if isinstance(error,Deferred):print(json.dumps({'error':'rate-limited' if error.status=='rate-limited' else 'authentication-refused','retry_after':error.retry_after}))
         else:print(json.dumps({'error':'authority-refused'}))
+    except Conflict:print(json.dumps({'error':'authority-refused'}))
     except RuntimeError as error:
         from .gateway_google_chat_oauth_sdk import EnrollmentFailure
         if not isinstance(error,EnrollmentFailure):raise

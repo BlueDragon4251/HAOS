@@ -3,6 +3,7 @@ import asyncio
 from contextvars import ContextVar
 import hashlib
 import json
+import math
 import re
 import threading
 import time
@@ -14,6 +15,14 @@ from .gateway_google_chat import resource,scope
 from .gateway_google_chat_output import sealed
 
 _CURRENT=ContextVar('haos_google_file_operation',default=None)
+_LOOKUP_SEAL=object()
+
+
+class _Lookup:
+    def __init__(self,ledger,identity,generation,proof_sha256):
+        self.ledger=ledger;self.identity=identity;self.generation=generation;self.proof_sha256=proof_sha256
+        self.used=False;self.seal=_LOOKUP_SEAL
+
 HEX=re.compile('[a-f0-9]{64}\\Z')
 
 
@@ -32,6 +41,12 @@ class FileLedger:
             proof TEXT NOT NULL,proof_sha256 TEXT NOT NULL,client_id TEXT NOT NULL UNIQUE,
             request_id TEXT NOT NULL,upload_state TEXT NOT NULL,attachment_ref TEXT NOT NULL,
             state TEXT NOT NULL,receipt TEXT NOT NULL,created_at REAL NOT NULL,owner_retry_generation INTEGER NOT NULL DEFAULT 0)''')
+        if 'upload_retry_generation' not in {row[1] for row in self.db.execute('PRAGMA table_info(google_chat_file_writes)')}:
+            self.db.execute('ALTER TABLE google_chat_file_writes ADD COLUMN upload_retry_generation INTEGER NOT NULL DEFAULT 0')
+        self.db.execute('''CREATE TABLE IF NOT EXISTS google_chat_file_owner_events(
+            id TEXT PRIMARY KEY,write_id TEXT NOT NULL,action TEXT NOT NULL,generation INTEGER NOT NULL,state TEXT NOT NULL,
+            owner_uid INTEGER NOT NULL,note_sha256 TEXT NOT NULL,snapshot_sha256 TEXT NOT NULL,receipt TEXT NOT NULL,created_at REAL NOT NULL,
+            UNIQUE(write_id,action,generation))''')
 
     def get(self,identity,proof):
         fields={'connector','credential_scope','account_scope','binding_id','binding_digest','chat','thread','subject','token_id','client_sha256','source','file_id','file_sha256','filename','mime','caption'}
@@ -55,55 +70,113 @@ class FileLedger:
         if row is not None:
             if (row['proof']!=encoded or row['proof_sha256']!=digest(proof) or row['connector']!=proof['connector']
                     or row['credential_scope']!=proof['credential_scope'] or row['account_scope']!=proof['account_scope'] or row['client_id']!=client or row['request_id']!=request
-                    or row['upload_state'] not in {'not-started','uploading','uploaded'} or row['state'] not in {'prepared','writing','confirmed','owner-retry-approved'}
+                    or row['upload_state'] not in {'not-started','uploading','uploaded','retry-approved'} or row['state'] not in {'prepared','writing','confirmed','owner-retry-approved'}
                     or type(row['owner_retry_generation']) is not int or not 0<=row['owner_retry_generation']<=4
+                    or type(row['upload_retry_generation']) is not int or not 0<=row['upload_retry_generation']<=2
+                    or type(row['created_at']) not in {int,float} or not math.isfinite(row['created_at']) or not 0<row['created_at']<=253402300799
                     or (row['upload_state']=='uploaded')!=bool(row['attachment_ref']) or (row['state']=='confirmed')!=bool(row['receipt'])
                     or row['state']!='prepared' and row['upload_state']!='uploaded'):
                 raise Conflict('Google file write identity, source or journal changed')
             if row['attachment_ref']:
                 ref=attachment(json.loads(row['attachment_ref']))
                 if json.dumps(ref,sort_keys=True,separators=(',',':'))!=row['attachment_ref']:raise Conflict('Google upload reference changed')
+                from .redaction import Redactor
+                aliases=Redactor([*self.redactor.secrets,*ref.values()]).secrets
+                if len(aliases)>4096 or sum(len(v) for v in aliases)>8*1024*1024:raise Conflict('private Google reference redaction capacity reached')
+                self.redactor.secrets=aliases
             if row['receipt']:resource(row['receipt'],'message',space=proof['chat'])
+            for action,generation,phase in [('retry-upload',row['upload_retry_generation'],row['upload_state']),('retry-file',row['owner_retry_generation'],row['state'])]:
+                if generation:
+                    allowed={'retry-approved','uploading','uploaded'} if action=='retry-upload' else {'owner-retry-approved','writing','confirmed'}
+                    if phase not in allowed:raise Conflict('Google file retry cannot return to an initial unaudited phase')
+                    audit=self.db.execute('SELECT state FROM google_chat_file_owner_events WHERE write_id=? AND action=? AND generation=?',(identity,action,generation)).fetchone()
+                    wanted={'approved'} if phase in {'retry-approved','owner-retry-approved'} else {'confirmed'} if phase in {'uploaded','confirmed'} else ({'reconciling','consumed'} if action=='retry-file' else {'consumed'})
+                    if audit is None or audit['state'] not in wanted:raise Conflict('Google file retry phase lacks its exact consumed Owner audit')
+                elif phase in {'retry-approved','owner-retry-approved'}:raise Conflict('Google file retry lacks an Owner generation')
             return dict(row)
         count,used=self.db.execute('SELECT COUNT(*),COALESCE(SUM(length(proof)+length(attachment_ref)),0) FROM google_chat_file_writes').fetchone()
         if count>=65536 or used+len(encoded.encode())>16*1024*1024:raise Conflict('Google file journal full; Owner recovery required')
-        self.db.execute('INSERT INTO google_chat_file_writes VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+        self.db.execute('''INSERT INTO google_chat_file_writes(id,connector,credential_scope,account_scope,proof,proof_sha256,client_id,request_id,upload_state,attachment_ref,state,receipt,created_at,owner_retry_generation) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
             (identity,proof['connector'],proof['credential_scope'],proof['account_scope'],encoded,digest(proof),client,request,'not-started','','prepared','',time.time(),0))
         return self.get(identity,proof)
+
+    def _transaction(self,operation):
+        self.db.execute('BEGIN IMMEDIATE')
+        try:
+            value=operation();self.db.execute('COMMIT');return value
+        except BaseException:
+            if self.db.in_transaction:self.db.execute('ROLLBACK')
+            raise
+
+    def _audit_phase(self,row,action,before,after):
+        generation=row['upload_retry_generation' if action=='retry-upload' else 'owner_retry_generation']
+        if not generation:return
+        changed=self.db.execute('UPDATE google_chat_file_owner_events SET state=? WHERE write_id=? AND action=? AND generation=? AND state=?',
+            (after,row['id'],action,generation,before)).rowcount
+        if changed!=1:raise Conflict('Google file retry Owner audit changed or was consumed already')
 
     def uploading(self,identity,proof):
         row=self.get(identity,proof)
         if row['upload_state']=='uploaded':return attachment(json.loads(row['attachment_ref']))
-        if row['state']!='prepared' or row['upload_state']!='not-started':raise Conflict('Google upload was already begun; no automatic repetition')
-        if self.db.execute("UPDATE google_chat_file_writes SET upload_state='uploading' WHERE id=? AND state='prepared' AND upload_state='not-started'",(identity,)).rowcount!=1:
-            raise Conflict('Google upload intent changed')
-        return None
+        if row['state']!='prepared' or row['upload_state'] not in {'not-started','retry-approved'}:raise Conflict('Google upload was already begun; no automatic repetition')
+        def begin():
+            if row['upload_state']=='retry-approved':self._audit_phase(row,'retry-upload','approved','consumed')
+            if self.db.execute("UPDATE google_chat_file_writes SET upload_state='uploading' WHERE id=? AND state='prepared' AND upload_state=?",(identity,row['upload_state'])).rowcount!=1:
+                raise Conflict('Google upload intent changed')
+        self._transaction(begin);return None
 
     def uploaded(self,identity,proof,ref):
         row=self.get(identity,proof);ref=attachment(ref)
         if row['state']!='prepared' or row['upload_state']!='uploading':raise Conflict('current durable Google upload intent required')
         from .redaction import Redactor
-        self.redactor.secrets=Redactor([*self.redactor.secrets,*ref.values()]).secrets
+        secrets=Redactor([*self.redactor.secrets,*ref.values()]).secrets
+        if len(secrets)>4096 or sum(len(v) for v in secrets)>8*1024*1024:raise Conflict('Google private reference redaction capacity reached')
+        self.redactor.secrets=secrets
         encoded=json.dumps(ref,sort_keys=True,separators=(',',':'))
         used=self.db.execute('SELECT COALESCE(SUM(length(proof)+length(attachment_ref)),0) FROM google_chat_file_writes').fetchone()[0]
         if used+len(encoded.encode())>16*1024*1024:raise Conflict('Google file reference custody full')
-        if self.db.execute("UPDATE google_chat_file_writes SET upload_state='uploaded',attachment_ref=? WHERE id=? AND state='prepared' AND upload_state='uploading'",(encoded,identity)).rowcount!=1:
-            raise Conflict('Google upload acceptance changed')
-        return ref
+        def accept():
+            if self.db.execute("UPDATE google_chat_file_writes SET upload_state='uploaded',attachment_ref=? WHERE id=? AND state='prepared' AND upload_state='uploading'",(encoded,identity)).rowcount!=1:
+                raise Conflict('Google upload acceptance changed')
+            self._audit_phase(row,'retry-upload','consumed','confirmed')
+        self._transaction(accept);return ref
 
-    def writing(self,identity,proof):
+    def lookup(self,identity,proof):
+        """Consume an Owner permission before GET, even if that GET is interrupted."""
         row=self.get(identity,proof)
-        if row['state']!='prepared' or row['upload_state']!='uploaded':raise Conflict('one current uploaded Google file intent required')
-        if self.db.execute("UPDATE google_chat_file_writes SET state='writing' WHERE id=? AND state='prepared' AND upload_state='uploaded'",(identity,)).rowcount!=1:
-            raise Conflict('Google file publication intent changed')
+        if row['state']!='owner-retry-approved' or row['upload_state']!='uploaded':raise Conflict('explicit current Owner file retry required')
+        def begin():
+            self._audit_phase(row,'retry-file','approved','reconciling')
+            if self.db.execute("UPDATE google_chat_file_writes SET state='writing' WHERE id=? AND state='owner-retry-approved'",(identity,)).rowcount!=1:
+                raise Conflict('Google file reconciliation permission changed')
+        self._transaction(begin)
+        return _Lookup(self,identity,row['owner_retry_generation'],row['proof_sha256'])
+
+    def writing(self,identity,proof,*,lookup=None):
+        row=self.get(identity,proof)
+        retry=(isinstance(lookup,_Lookup) and lookup.seal is _LOOKUP_SEAL and lookup.ledger is self and not lookup.used
+            and lookup.identity==identity and lookup.generation==row['owner_retry_generation'] and lookup.proof_sha256==row['proof_sha256'])
+        if row['upload_state']!='uploaded' or not (row['state']=='prepared' or row['state']=='writing' and retry):
+            raise Conflict('initial Google file intent or current opaque post-GET404 one-shot permission required')
+        def begin():
+            if retry:self._audit_phase(row,'retry-file','reconciling','consumed')
+            if self.db.execute("UPDATE google_chat_file_writes SET state='writing' WHERE id=? AND state=? AND upload_state='uploaded'",(identity,row['state'])).rowcount!=1:
+                raise Conflict('Google file publication intent changed')
+        self._transaction(begin)
+        if retry:lookup.used=True
         return self.get(identity,proof)
 
     def confirm(self,identity,proof,response):
         row=self.get(identity,proof);name=receipt(response,proof,row['client_id'])
         if row['state'] not in {'writing','owner-retry-approved'}:raise Conflict('begun Google file publication required')
-        if self.db.execute("UPDATE google_chat_file_writes SET state='confirmed',receipt=? WHERE id=? AND state IN ('writing','owner-retry-approved')",(name,identity)).rowcount!=1:
-            raise Conflict('Google file acceptance changed')
-        return name
+        def accept():
+            if self.db.execute("UPDATE google_chat_file_writes SET state='confirmed',receipt=? WHERE id=? AND state=?",(name,identity,row['state'])).rowcount!=1:
+                raise Conflict('Google file acceptance changed')
+            if row['owner_retry_generation']:
+                previous=self.db.execute("SELECT state FROM google_chat_file_owner_events WHERE write_id=? AND action='retry-file' AND generation=?",(identity,row['owner_retry_generation'])).fetchone()
+                if previous is None or previous['state'] not in {'approved','reconciling','consumed'}:raise Conflict('Google file acceptance lacks its Owner retry history')
+                self._audit_phase(row,'retry-file',previous['state'],'confirmed')
+        self._transaction(accept);return name
 
     def own_message(self,connector,account,raw):
         """Authenticated callbacks cannot turn our user-authored file into a mission."""
@@ -216,7 +289,7 @@ class Files:
                     return SendResult(success=True,message_id=row['receipt'],raw_response={'upstream_acceptance_only':True,'recipient_read_verified':False})
             from .gateway_google_chat_file_http import FileAPI
             api=await FileAPI.open(self.store,native.policy,native.connector,self.adapter._haos_google_value,route,check,http=http,certificate_request=certificate_request)
-            state=None;token=None
+            state=None;token=None;lookup=None
             try:
                 redactor=self.store.inbox.redactor
                 if redactor.text(caption)!=caption or any(secret.encode() in artifact['data'] for secret in redactor.secrets if secret):
@@ -226,14 +299,22 @@ class Files:
                 if subject!=binding['sender']:raise PermissionError('Google native file cannot borrow another user or legacy identity')
                 row=self.ledger.get(operation,proof)
                 if row['state']=='confirmed':return SendResult(success=True,message_id=row['receipt'])
+                lookup=None
                 if row['state'] in {'writing','owner-retry-approved'}:
                     # An interrupted native create can only look up its own
                     # retained client ID. A 404 alone never permits another POST.
-                    response=await asyncio.to_thread(lambda:api.execute(api.service.spaces().messages().get(name=proof['chat']+'/messages/'+row['client_id'])))
-                    check();name=self.ledger.confirm(operation,proof,response)
-                    return SendResult(success=True,message_id=name,raw_response={'upstream_acceptance_only':True,'recipient_read_verified':False})
+                    if row['state']=='owner-retry-approved':lookup=self.ledger.lookup(operation,proof)
+                    try:
+                        response=await asyncio.to_thread(lambda:api.execute(api.service.spaces().messages().get(name=proof['chat']+'/messages/'+row['client_id'])))
+                    except Exception as error:
+                        from googleapiclient.errors import HttpError
+                        if not isinstance(error,HttpError) or error.resp.status!=404 or row['state']!='owner-retry-approved':raise
+                        check()
+                    else:
+                        check();name=self.ledger.confirm(operation,proof,response)
+                        return SendResult(success=True,message_id=name,raw_response={'upstream_acceptance_only':True,'recipient_read_verified':False})
                 state={'files':self,'api':api,'proof':proof,'operation':operation,'artifact':artifact,'check':check,'ended':threading.Event(),
-                    'task':asyncio.current_task(),'path':None,'facade':_Facade(self)}
+                    'task':asyncio.current_task(),'path':None,'facade':_Facade(self),'post_GET404_lookup':lookup}
                 token=_CURRENT.set(state)
                 with sealed(artifact['data']) as path:
                     state['path']=path
@@ -242,6 +323,7 @@ class Files:
                 if not result.success or row['state']!='confirmed' or result.message_id!=row['receipt']:raise Conflict('native Google file has no durable exact acceptance receipt')
                 return SendResult(success=True,message_id=row['receipt'],raw_response={'upstream_acceptance_only':True,'recipient_read_verified':False})
             finally:
+                if lookup is not None:lookup.used=True
                 if state is not None:state['ended'].set()
                 if token is not None:_CURRENT.reset(token)
                 api.close()
@@ -288,7 +370,7 @@ class _Facade:
         from plugins.platforms.google_chat.adapter import _create_kwargs
         if kwargs!=_create_kwargs(proof['chat'],body):raise PermissionError('actual native Google file projection changed')
         def execute():
-            self.manager.context();row=api.guard.call(lambda:self.manager.ledger.writing(identity,proof))
+            self.manager.context();row=api.guard.call(lambda:self.manager.ledger.writing(identity,proof,lookup=state['post_GET404_lookup']))
             exact={'parent':proof['chat'],'body':body,'messageId':row['client_id'],'requestId':row['request_id']}
             if proof['thread']:exact['messageReplyOption']='REPLY_MESSAGE_OR_FAIL'
             response=api.execute(api.service.spaces().messages().create(**exact))
