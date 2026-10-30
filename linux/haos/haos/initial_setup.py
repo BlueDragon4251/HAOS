@@ -572,7 +572,24 @@ def pair_gateway_sender(binding_id: str, connector: str, sender: str, chat: str,
             "scope": scope, "thread": thread, "identity": identity,
             "capabilities": list(capabilities)}
     selected=next((row for row in policy['connectors'] if row['id']==connector),None)
-    if selected and selected['platform']=='dingtalk':
+    if selected and selected['platform']=='buzz':
+        from .gateway_buzz import scope as buzz_scope,validate_binding
+        import secrets,time
+        saved=credentials['connectors'][connector];expected=buzz_scope(saved)
+        if scope and scope!=expected or chat not in saved['channels']:
+            raise ValueError('Buzz-Bereich und Kanal müssen zum gespeicherten Relay-Konto gehören.')
+        if sender==saved['public_key']:raise ValueError('Buzz darf sein eigenes Dienstkonto nicht freigeben.')
+        item.update(scope=expected,generation=secrets.token_hex(32),since=time.time_ns()//1_000_000,require_mention=require_mention)
+        for key,value in [('allow_media',allow_media),('allow_voice',allow_voice),('allow_video',allow_video),('allow_outbound_media',allow_outbound_media)]:
+            if type(value) is not bool:raise ValueError('Ausdrückliche Buzz-Medienfreigabe erforderlich.')
+            item[key]=value
+        validate_binding(item)
+        if allow_voice:
+            from .speech_setup import status as speech_status
+            speech=speech_status()
+            if not all(speech[key] for key in ['enabled','runtime_ready','model_ready']):
+                raise PermissionError('Lokalen Sprachdienst vor Buzz-Voice-Freigabe einrichten.')
+    elif selected and selected['platform']=='dingtalk':
         from .gateway_dingtalk import scope as dingtalk_scope,validate_binding
         import secrets,time
         saved=credentials['connectors'][connector];expected=dingtalk_scope(saved)
@@ -728,6 +745,9 @@ def gateway_configuration():
         | {'reply_mode':_credentials['connectors'][row['id']].get('reply_mode','session')}
         for row in policy['connectors'] if row['platform']=='dingtalk'}
     if dingtalk:result['dingtalk']=dingtalk
+    if any(row['platform']=='buzz' for row in policy['connectors']):
+        from .buzz_owner_setup import public as buzz_public
+        result['buzz']={row['id']:buzz_public(_credentials['connectors'][row['id']]) for row in policy['connectors'] if row['platform']=='buzz'}
     if any(row['platform']=='a2a' for row in policy['connectors']):
         from .a2a_owner_setup import public as a2a_public
         result['a2a']={row['id']:a2a_public(_credentials['connectors'][row['id']]) for row in policy['connectors'] if row['platform']=='a2a'}

@@ -1,8 +1,65 @@
-# Buzz — private integration in progress
+# Buzz — public owner setup and private native transport
 
-Buzz is still outside the public HAOS gateway registry. The public software
-count remains 14/22 after A2A. These prerequisites do not establish a working
-Buzz mission, GUI, external relay, installed OS or release acceptance.
+Buzz now has a public HAOS setup, independent authorization and production
+service path. Local source-bound fixtures establish software behavior; they do
+not establish a live relay account, subscription, external recipient delivery,
+installed OS, hardware or release acceptance.
+
+## Owner setup
+
+In graphical administration, open Gateways and choose **Buzz**. Enter a dedicated
+private Nostr key (hex or nsec), its independently expected public hex key, the
+canonical HTTPS relay origin and explicit channel UUIDs. Optional NIP-OA
+attestation and foreign attachment origins are separate account inputs. Saved
+private values are never read back into the form. Reusing a key/attestation is
+an explicit choice and cannot silently cross relay/account identities.
+
+Save the account before pairing. Enter each exact sender public key, selected
+channel and optional thread; the saved relay/account scope is fixed. Unknown
+senders and the service's own key are refused. Mention, incoming files, local
+voice, video and outgoing attachment rights remain separate choices. Every
+selected channel needs an explicit grant before service activation. Account
+rotation withdraws old grants without deleting retained journals or recovery
+material. Normal removal/revocation uses the existing gateway administration.
+
+Account inspection performs bounded read-only native checks without a message.
+After correcting credentials, explicitly release a local authentication block;
+this preserves rate-limit deadlines and does not send. Inspect private upload,
+signed reply, original-source and history receipts in the same page. Select the
+exact receipt and supply a nonsecret reason plus explicit confirmation before
+recovery. Original disposal requires withdrawal/change of its grant and retains
+an audited tombstone. It compacts both original bytes and payload-bearing proof;
+it does not promise erasure of backups, WAL or independent mission copies.
+Changed-grant history restarts require explicit inspection and retain the full
+previous checkpoint. Uncertain replies retain their exact signed event and
+require independent non-delivery review plus separate controller recovery;
+confirmed acceptance is never permission to repeat a message.
+
+The same account, pairing and inspected recovery backends are exposed through
+`haos-owner gateway setup --help`, `haos-owner gateway buzz-account --help` and `haos-owner gateway pair --help`. Root
+performs publication and policy checks; a bounded child with the actual private
+gateway UID performs account/journal operations. Neither keys nor arbitrary
+filesystem paths are returned to the agent. No live messages are sent by the
+local test suite.
+
+## Build and verification
+
+`runtime/build_buzz.py` checks the exact official archive size and digest,
+Rust/Cargo 1.98.1, both frozen dependency locks and reviewed source overlays.
+The digest-pinned Bookworm builder emits the actual native CLI, official SDK
+verifier and executable/source provenance. Installed immutable files are checked
+by the image build before runtime setup. Both locally built programs require at
+most glibc 2.34; the allowed ceiling is 2.36. The dedicated Buzz CI workflow
+builds these programs and runs native protocol, disposable UID/controller/
+production service and real Tk contracts. Full OS image/ISO building and
+installed release acceptance remain separate master-plan gates.
+
+Current activation evidence is recorded in
+[buzz-public-owner-validation.json](evidence/2026-10-30/buzz-public-owner-validation.json).
+The detailed sections below preserve the earlier development checkpoints and
+must be read as historical observations, not the current activation checklist.
+
+## Historical prerequisite checkpoints
 
 The actual pinned Hermes Buzz adapter uses the official Rust `buzz` CLI for
 queries and writes, plus native NIP-42 WebSocket authentication and polling.
@@ -62,7 +119,7 @@ refused; writable, changed, multiply linked or symlinked programs are refused.
 Actual unprivileged identities cannot alter program/provenance files or read
 an owner canary. These checks use real kernel identities and files, not mocks.
 
-## Outstanding before public activation
+## Historical outstanding work at the prerequisite checkpoint
 
 The complete native adapter lifecycle, authenticated WebSocket boundary,
 integration of retained history into live dispatch, incoming/outgoing media and local voice,

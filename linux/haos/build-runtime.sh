@@ -7,6 +7,11 @@ test -f .herald-os-upstream-sha
 export UV_CACHE_DIR=/tmp/haos-uv-cache
 export UV_PROJECT_ENVIRONMENT=/usr/lib/haos/hermes/.venv
 HAOS_RUNTIME_OVERLAY=/tmp/herald-os/linux/haos/runtime
+test -x /usr/lib/haos/buzz/buzz
+test -x /usr/lib/haos/buzz/haos-buzz-verify
+# This verifies immutable installed file/provenance hashes without importing
+# Hermes or running a credentialed SDK under the image-builder root identity.
+PYTHONPATH=/usr/lib/haos /usr/bin/python3.11 -c 'from haos.gateway_buzz_crypto import command; command("buzz"); command("haos-buzz-verify")'
 python3 "$HAOS_RUNTIME_OVERLAY/install_copilot.py" /usr/lib/haos/copilot
 python3 "$HAOS_RUNTIME_OVERLAY/prepare.py" /usr/lib/haos/hermes "$HAOS_RUNTIME_OVERLAY"
 # The Fedora Python 3.11 RPM lives in immutable /usr. Do not depend on uv's
@@ -20,6 +25,7 @@ uv pip check --python .venv/bin/python
 cmp /tmp/haos-registry.json /usr/lib/haos/haos/hermes_registry.json
 mkdir -p /usr/lib/haos/runtime-provenance
 cp "$HAOS_RUNTIME_OVERLAY/source.json" "$HAOS_RUNTIME_OVERLAY/requirements.txt" "$HAOS_RUNTIME_OVERLAY/homeassistant-protocol-source.json" "$HAOS_RUNTIME_OVERLAY/irc-protocol-source.json" /usr/lib/haos/runtime-provenance/
+cp /usr/lib/haos/buzz/source.json /usr/lib/haos/runtime-provenance/buzz-native-source.json
 uv pip freeze --python .venv/bin/python > /usr/lib/haos/runtime-provenance/installed.txt
 # Installed /usr is immutable and runtime bytecode writes are disabled. Compile
 # actual trusted sources here instead of parsing the entire cold import graph

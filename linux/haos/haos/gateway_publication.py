@@ -35,6 +35,13 @@ def validate_snapshot(policy, credentials):
                     or binding.get('allow_callback') is True and binding['sender'] not in row.get('callbacks',{})) for binding in policy['bindings']):
                 raise ValueError('A2A peer/context/callback grant differs from saved server identity')
             continue
+        if platforms[name]=='buzz':
+            from .gateway_buzz import credentials as buzz_credentials,scope
+            if buzz_credentials(row)!=row:raise ValueError('canonical private Buzz identity, relay and channels required')
+            if any(binding['connector']==name and (binding['scope']!=scope(row) or binding['chat'] not in row['channels']
+                    or binding['sender']==row['public_key']) for binding in policy['bindings']):
+                raise ValueError('Buzz grant differs from saved relay identity/channel or approves its own account')
+            continue
         if platforms[name]=='dingtalk':
             from .gateway_dingtalk import credentials as dingtalk_credentials,scope
             if dingtalk_credentials(row)!=row:raise ValueError('canonical private DingTalk account required')

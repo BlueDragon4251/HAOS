@@ -638,7 +638,7 @@ class Wizard:
                 result_handler=lambda _: self.show("gateways"))).pack(anchor="w", pady=4)
             connector = self._field(self.content, "Konnektor-ID (z. B. telegram-main)", "telegram-main")
             connector_value=tk.StringVar(value=connector.get());connector.configure(textvariable=connector_value);connector._haos_public_value=connector_value
-            platform = self._choice(self.content, "Plattform", ["telegram", "discord", "slack", "mattermost", "matrix", "ntfy", "homeassistant", "irc", "line", "sms", "email", "feishu", "dingtalk", "a2a"], "telegram")
+            platform = self._choice(self.content, "Plattform", ["telegram", "discord", "slack", "mattermost", "matrix", "ntfy", "homeassistant", "irc", "line", "sms", "email", "feishu", "dingtalk", "a2a", "buzz"], "telegram")
             token_box=tk.Frame(self.content,bg=self.PANEL);token_box.pack(fill='x')
             token = self._field(token_box, "Bot-Token / Zugangstoken (geschützte Eingabe)", secret=True)
             slack_credentials = tk.Frame(self.content,bg=self.PANEL)
@@ -870,7 +870,17 @@ class Wizard:
             def a2a_refreshed(value):
                 a2a_form.reset(value);a2a_peers.reset(value);a2a_pair.route_changed()
             a2a_form.on_saved=a2a_refreshed;a2a_peers.on_saved=a2a_refreshed
+            from .buzz_owner_gui import AccountForm as BuzzAccountForm,RecoveryForm as BuzzRecoveryForm
+            buzz_form=BuzzAccountForm(self,self.content,connector.get);buzz_recovery=BuzzRecoveryForm(self,self.content,connector.get,buzz_form)
+            connector_value.trace_add('write',buzz_form.clear_secret);connector_value.trace_add('write',buzz_recovery.clear)
+            def buzz_refreshed(value):
+                configured_gateways.setdefault('buzz',{})[connector.get()]=value
+                configured_gateways['connectors']=[row for row in configured_gateways['connectors'] if row['id']!=connector.get()]+[{'id':connector.get(),'platform':'buzz'}]
+                buzz_form.reset(value);buzz_pair.changed();buzz_recovery.clear()
+            buzz_form.on_saved=buzz_refreshed
             def configure():
+                if platform.get()=='buzz':
+                    buzz_form.configure();return
                 if platform.get()=='a2a':
                     a2a_form.configure();return
                 if platform.get()=='dingtalk':
@@ -921,6 +931,8 @@ class Wizard:
             def platform_changed(*_args):
                 reset_sms();reset_line();email_form.reset();feishu_form.reset();dingtalk_form.reset()
                 a2a_form.reset();a2a_peers.reset()
+                buzz_form.reset();buzz_recovery.clear()
+                for form in [buzz_form,buzz_recovery]:form.frame.pack_forget()
                 for form in [a2a_form,a2a_peers,a2a_recovery]:form.frame.pack_forget()
                 dingtalk_form.frame.pack_forget()
                 feishu_form.frame.pack_forget()
@@ -938,11 +950,11 @@ class Wizard:
                     if existing:
                         for field,key in ((irc_server,'server'),(irc_port,'port'),(irc_nick,'nickname'),(irc_channel,'channel')):
                             field.delete(0,tk.END);field.insert(0,str(existing[key]))
-                elif platform.get() in {'line','sms','email','feishu','dingtalk','a2a'}:
+                elif platform.get() in {'line','sms','email','feishu','dingtalk','a2a','buzz'}:
                     irc_credentials.pack_forget();token_box.pack_forget()
                 else:
                     irc_credentials.pack_forget();token_box.pack(fill='x',before=configure_button)
-                if connector.get() in {'telegram-main','discord-main','slack-main','mattermost-main','matrix-main','ntfy-main','homeassistant-main','irc-main','line-main','sms-main','email-main','feishu-main','dingtalk-main','a2a-main'}:
+                if connector.get() in {'telegram-main','discord-main','slack-main','mattermost-main','matrix-main','ntfy-main','homeassistant-main','irc-main','line-main','sms-main','email-main','feishu-main','dingtalk-main','a2a-main','buzz-main'}:
                     connector.delete(0,tk.END);connector.insert(0,platform.get()+'-main')
                     if platform.get()=='a2a':
                         saved_a2a=[row['id'] for row in configured_gateways['connectors'] if row['platform']=='a2a']
@@ -951,6 +963,9 @@ class Wizard:
                     value=configured_gateways.get('a2a',{}).get(connector.get())
                     a2a_form.reset(value);a2a_peers.reset(value)
                     for form in [a2a_form,a2a_peers,a2a_recovery]:form.frame.pack(fill='x',before=configure_button)
+                if platform.get()=='buzz':
+                    buzz_form.reset(configured_gateways.get('buzz',{}).get(connector.get()))
+                    for form in [buzz_form,buzz_recovery]:form.frame.pack(fill='x',before=configure_button)
                 if platform.get()=='irc':
                     existing=configured_gateways.get('irc',{}).get(connector.get())
                     if existing:
@@ -1344,6 +1359,9 @@ class Wizard:
             from .a2a_owner_gui import PairForm as A2APairForm
             a2a_pair=A2APairForm(self,self.content,platform,a2a_form,sender,chat,scope,thread,rights,rights_widgets,pairing_note)
             connector_value.trace_add('write',a2a_pair.clear)
+            from .buzz_owner_gui import PairForm as BuzzPairForm
+            buzz_pair=BuzzPairForm(self,self.content,platform,buzz_form,sender,chat,scope,thread,rights,pairing_note)
+            connector_value.trace_add('write',buzz_pair.clear)
             def retry_irc():
                 selected_connector=connector.get()
                 self._run_async(lambda:initial_setup.retry_irc_gateway_auth(selected_connector),
@@ -1354,6 +1372,11 @@ class Wizard:
                             tuple(key for key, value in rights.items() if value.get()))
                 if platform.get()=='a2a':
                     a2a_pair.apply(selected);return
+                buzz_options=None
+                if platform.get()=='buzz':
+                    try:buzz_options=buzz_pair.options()
+                    except ValueError as error:
+                        self._show_error(describe_error(error,area=self.page));return
                 selected_scope, selected_thread = scope.get(), thread.get()
                 requested_irc_port=None
                 if platform.get()=='irc':
@@ -1369,6 +1392,7 @@ class Wizard:
                 options=({'matrix_devices':[dict(row) for row in approved_devices],'allow_plaintext':allow_plain.get(),
                     'require_mention':mention_required.get()} if platform.get()=='matrix'
                     else {'trust_topic_publishers':trust_publishers.get(),'ntfy_server_url':ntfy_server.get()} if platform.get()=='ntfy'
+                    else buzz_options if platform.get()=='buzz'
                     else dingtalk_pair.options() if platform.get()=='dingtalk'
                     else feishu_pair.options() if platform.get()=='feishu'
                     else email_pair.options() if platform.get()=='email'
@@ -1378,6 +1402,7 @@ class Wizard:
                         'homeassistant_server_url':ha_server.get()} if platform.get()=='homeassistant' else {'irc_server':irc_server.get(),'irc_port':requested_irc_port,'irc_channel':irc_channel.get()} if platform.get()=='irc' else {})
                 reset_sms_voice_consent();email_pair.clear();feishu_pair.clear();dingtalk_pair.clear()
                 line_allow_media.set(False);line_allow_voice.set(False);line_allow_video.set(False);line_allow_outbound.set(False)
+                if platform.get()=='buzz':buzz_pair.clear()
                 self._run_async(lambda: initial_setup.pair_gateway_sender(*selected, scope=selected_scope, thread=selected_thread,**options),
                                 success="Absender und ausgewählte Rechte für die exakte Route gespeichert. Gateway-Neustart erforderlich.")
             self._button(self.content, "Absender mit ausgewählten Rechten freigeben",
@@ -1489,7 +1514,8 @@ class Wizard:
                     from .email_owner_gui import LABELS as email_labels
                     from .feishu_owner_gui import LABELS as feishu_labels
                     from .dingtalk_owner_gui import LABELS as dingtalk_labels
-                    labels=(dingtalk_labels if item.get('platform')=='dingtalk' else feishu_labels if item.get('platform')=='feishu' else email_labels if item.get('platform')=='email' else matrix_labels if item.get('platform')=='matrix' else ntfy_labels if item.get('platform')=='ntfy'
+                    from .buzz_owner_gui import LABELS as buzz_labels
+                    labels=(buzz_labels if item.get('platform')=='buzz' else dingtalk_labels if item.get('platform')=='dingtalk' else feishu_labels if item.get('platform')=='feishu' else email_labels if item.get('platform')=='email' else matrix_labels if item.get('platform')=='matrix' else ntfy_labels if item.get('platform')=='ntfy'
                         else {**{key:value.replace('LINE','SMS/Twilio') for key,value in line_labels.items()},
                             'authentication-refused':'SMS/Twilio-Anmeldung abgelehnt; Account SID und privaten Auth-Token prüfen',
                             'identity-refused':'SMS/Twilio-Konto oder eigene Empfangsnummer passt nicht; gespeicherte Daten bleiben erhalten',

@@ -8,6 +8,55 @@ import stat
 import subprocess
 
 
+def configure(connector,value):
+    from .initial_setup import require_root,quiesce_for_setup
+    require_root()
+    from .gateway_buzz import credentials,scope
+    from .gateway_setup import load,persist
+    from .gateway import GatewayPolicy
+    from .owner import audit
+    value=credentials(value);policy,private=load()
+    if any(row['id']!=connector and row['platform']=='buzz' and scope(private['connectors'][row['id']])==scope(value)
+            for row in policy['connectors']):raise ValueError('Eine Buzz-Relay-Identität darf nur einem Konnektor gehören.')
+    old=next((row for row in policy['connectors'] if row['id']==connector),None)
+    if old is not None and (old['platform']!='buzz' or private['connectors'].get(connector)!=value):
+        policy['bindings']=[row for row in policy['bindings'] if row['connector']!=connector]
+    policy['connectors']=[row for row in policy['connectors'] if row['id']!=connector]+[{'id':connector,'platform':'buzz'}]
+    GatewayPolicy(policy);quiesce_for_setup(gateway_only=True)
+    private['connectors'][connector]=value;persist(policy,private)
+    audit('setup.gateway',{'connector':connector,'platform':'buzz'})
+    return {'configured':True,'platform':'buzz','sender_pairing_required':True,'restart_required':True,'message_sent':False,
+        'external_acceptance_verified':False}
+
+
+def public(value):
+    from .gateway_buzz import credentials,scope
+    value=credentials(value)
+    return {key:value[key] for key in ['public_key','relay_url','channels']}|{'attachment_origins':value.get('attachment_origins',[]),
+        'saved_private_key':True,'saved_auth_tag':bool(value.get('auth_tag')),'scope':scope(value),
+        'profile':scope(value).replace('buzz:','buzz-',1)}
+
+
+def save_account(connector,account,private_key='',auth_tag='',*,keep_key=False,keep_auth=False):
+    from .initial_setup import require_root
+    require_root()
+    if (not isinstance(account,dict) or set(account)!={'public_key','relay_url','channels','attachment_origins'}
+            or type(keep_key) is not bool or type(keep_auth) is not bool):raise ValueError('Exakte Buzz-Kontofelder und ausdrückliche Schlüsselwahl erforderlich.')
+    old=None
+    if keep_key or keep_auth:_,old=saved(connector)
+    if keep_key or keep_auth:
+        if any(account[key]!=old[key] for key in ['public_key','relay_url']):raise ValueError('Gespeicherte Schlüssel gelten nur für unveränderte Identität und Relay.')
+    if keep_key:
+        if private_key:raise ValueError('Gespeicherten oder neu eingegebenen privaten Schlüssel wählen.')
+        private_key=old['private_key']
+    if keep_auth:
+        if auth_tag or not old.get('auth_tag'):raise ValueError('Exakt gespeicherte NIP-OA-Attestierung oder neue Eingabe wählen.')
+        auth_tag=old['auth_tag']
+    value={**account,'private_key':private_key}
+    if auth_tag:value['auth_tag']=auth_tag
+    return configure(connector,value)
+
+
 def saved(connector):
     from .initial_setup import require_root
     require_root()
@@ -59,11 +108,44 @@ def _invoke(connector,action,params):
     return checked
 
 
-def inspect(connector,action='account'):
+def inspect(connector,action='account',*,profile=None):
     from .initial_setup import require_root
     require_root()
-    if not isinstance(action,str) or action not in {'account','outputs','outgoing'}:raise ValueError('closed no-send Buzz inspection action required')
-    return _invoke(connector,action,{})
+    if not isinstance(action,str) or action not in {'account','outputs','outgoing','source-profiles','sources','history'}:
+        raise ValueError('closed no-send Buzz inspection action required')
+    params={}
+    if action in {'sources','history'}:
+        from .gateway_buzz_source_recovery import profile_name
+        if profile is None:_,value=saved(connector);profile=public(value)['profile']
+        params={'profile':profile_name(profile)}
+    elif profile is not None:raise ValueError('Buzz profile selector applies only to source/history inspection')
+    return _invoke(connector,action,params)
+
+
+def recover_source(connector,row,action,note,*,confirmed=False):
+    from .initial_setup import require_root
+    require_root()
+    from .gateway_buzz import HEX,channel
+    from .gateway_buzz_source_recovery import profile_name
+    if (not isinstance(row,dict) or not isinstance(row.get('snapshot_sha256'),str) or not HEX.fullmatch(row['snapshot_sha256'])
+            or not isinstance(action,str) or action not in {'purge-source','reset-history'} or confirmed is not True
+            or not isinstance(note,str) or not 1<=len(note.strip())<=2000):raise PermissionError('exact inspected Buzz source/history decision required')
+    params={'profile':profile_name(row.get('profile')),'snapshot_sha256':row['snapshot_sha256'],
+        'owner_uid':int(os.environ.get('SUDO_UID','0')),'note_sha256':hashlib.sha256(note.strip().encode()).hexdigest(),'confirmed':True}
+    if action=='reset-history':params['channel']=channel(row.get('channel'))
+    else:
+        if not isinstance(row.get('id'),str) or not HEX.fullmatch(row['id']):raise ValueError('exact Buzz original receipt required')
+        params['id']=row['id']
+    return _invoke(connector,action,params)
+
+
+def retry_auth(connector,note,*,confirmed=False):
+    from .initial_setup import require_root
+    require_root()
+    if confirmed is not True or not isinstance(note,str) or not 1<=len(note.strip())<=2000:
+        raise PermissionError('Erneute Buzz-Authentifizierung ausdrücklich bestätigen und begründen.')
+    return _invoke(connector,'retry-auth',{'connector':connector,'owner_uid':int(os.environ.get('SUDO_UID','0')),
+        'note_sha256':hashlib.sha256(note.strip().encode()).hexdigest(),'confirmed':True})
 
 
 def recover_upload(connector,row,action,note,*,confirmed=False):

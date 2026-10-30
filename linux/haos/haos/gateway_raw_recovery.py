@@ -30,7 +30,7 @@ def unresolved(inbox, after=0):
         pattern=(r'[1-9][0-9]{0,15}\.[0-9]{6}' if row['platform']=='slack' else
             r'[1-9][0-9]{0,19}' if row['platform']=='discord' else
             r'[a-z0-9]{26}' if row['platform']=='mattermost' else
-            r'[0-9a-f]{64}' if row['platform'] in {'homeassistant','irc','line','email'} else
+            r'[0-9a-f]{64}' if row['platform'] in {'homeassistant','irc','line','email','buzz'} else
             r'(?:SM|MM)[0-9a-fA-F]{32}' if row['platform']=='sms' else
             r'om_[A-Za-z0-9]{16,64}' if row['platform']=='feishu' else
             r'[A-Za-z0-9_-]{1,64}' if row['platform']=='ntfy' else None)
@@ -180,7 +180,9 @@ def unresolved(inbox, after=0):
     from .gateway_dingtalk_media_recovery import outgoing as dingtalk_media_outgoing,batches as dingtalk_batches
     private_accounts=dingtalk_accounts(inbox)
     accounts=feishu_accounts(inbox)
-    return {**({'dingtalk_accounts':private_accounts} if private_accounts else {}),**({'feishu_accounts':accounts} if accounts else {}),'native_batches':dingtalk_batches(inbox),'ingress':result,'history':history,'transport':transport,'recovery_rejections':rejected,'native_outgoing':outgoing(inbox)+line_outgoing(inbox)+line_outgoing(inbox,'sms')+email_outgoing(inbox)+feishu_outgoing(inbox)+feishu_media_outgoing(inbox)+dingtalk_outgoing(inbox)+dingtalk_media_outgoing(inbox),'email_mailboxes':mailboxes(inbox),
+    from .gateway_buzz_recovery import outgoing as buzz_outgoing,transport as buzz_transport
+    transport.extend(buzz_transport(inbox))
+    return {**({'dingtalk_accounts':private_accounts} if private_accounts else {}),**({'feishu_accounts':accounts} if accounts else {}),'native_batches':dingtalk_batches(inbox),'ingress':result,'history':history,'transport':transport,'recovery_rejections':rejected,'native_outgoing':outgoing(inbox)+line_outgoing(inbox)+line_outgoing(inbox,'sms')+email_outgoing(inbox)+feishu_outgoing(inbox)+feishu_media_outgoing(inbox)+dingtalk_outgoing(inbox)+dingtalk_media_outgoing(inbox)+buzz_outgoing(inbox),'email_mailboxes':mailboxes(inbox),
         'next_cursor':rows[-1]['cursor'] if rows else after}
 
 

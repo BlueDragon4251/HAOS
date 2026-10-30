@@ -78,6 +78,9 @@ from pathlib import Path
 from types import MethodType,SimpleNamespace
 from haos.gateway_runtime import require_runtime_identity,prepare_runtime_home
 require_runtime_identity();prepare_runtime_home()
+if sys.argv[1]=='production':
+    from haos.gateway_runtime import serve
+    asyncio.run(serve());sys.exit(0)
 from haos.gateway import digest,Conflict
 from haos.gateway_buzz import PreparedBuzzPolicy,scope
 from haos.gateway_buzz_crypto import verify
@@ -687,9 +690,10 @@ except PermissionError as error:
                         assert original['content']=='Private local result file\n[result-0.pdf]('+url+')'
                         assert [tag for tag in original['tags'] if tag[0]=='imeta']==[['imeta','url '+url,'m application/pdf','x '+sha,
                             'size '+str(len(assets['/media/'+sha+'.pdf'])),'filename result-0.pdf']]
-                    elif mode['name']!='controller':assert original['content']=='Private local fixture '+expected
-                    if mode['name']=='controller':
-                        with sqlite3.connect('file:'+str(private/'controller-native.db')+'?mode=ro',uri=True) as check:
+                    elif mode['name'] not in {'controller','production'}:assert original['content']=='Private local fixture '+expected
+                    if mode['name'] in {'controller','production'}:
+                        journal='native-inbox.db' if mode['name']=='production' else 'controller-native.db'
+                        with sqlite3.connect('file:'+str(private/journal)+'?mode=ro',uri=True) as check:
                             intent=check.execute("SELECT delivery_id,signed_raw,target FROM buzz_delivery_intents WHERE event_id=? AND state='writing'",(original['id'],)).fetchone()
                             assert intent is not None and intent[1]==body
                         row=controller_store.db.execute('SELECT content,state FROM gateway_outbox WHERE id=?',(intent[0],)).fetchone()
@@ -713,8 +717,8 @@ except PermissionError as error:
                 selection=json.loads(body);queries.append(selection);query_auth.append(auth['id'])
                 assert isinstance(selection,list) and len(selection)==1
                 if selection[0].get('ids')==[event['id']]:return web.json_response([event])
-                if mode['name']=='controller':
-                    selected=json.loads(fixture.read_text())['controller-source']
+                if mode['name'] in {'controller','production'}:
+                    selected=json.loads(fixture.read_text())[mode['name']+'-source']
                     if selection[0].get('ids')==[selected['id']]:return web.json_response([selected])
                 if mode['name'] in {'reader-auth','profile-auth'}:return web.json_response({'error':'not channel members '+scalar},status=401)
                 if mode['name']=='reader-rate':return web.json_response({'error':'rate limited fixture'},status=429)
@@ -747,8 +751,8 @@ except PermissionError as error:
             assert first[0]=='REQ' and first[2]['#h']==[channel] and second[2]['#p']==[public]
             if mode['name'] in {'receive','profile'} or mode['name'].startswith('outbox'):
                 await socket.send_json(['EVENT',first[1],unknown]);await socket.send_json(['EVENT',first[1],event]);await socket.send_json(['EVENT',first[1],event])
-            if mode['name']=='controller':
-                selected=json.loads(fixture.read_text())['controller-source']
+            if mode['name'] in {'controller','production'}:
+                selected=json.loads(fixture.read_text())[mode['name']+'-source']
                 await socket.send_json(['EVENT',first[1],unknown]);await socket.send_json(['EVENT',first[1],selected]);await socket.send_json(['EVENT',first[1],selected])
             async for message in socket:
                 if message.type==web.WSMsgType.TEXT:subscriptions.append(json.loads(message.data))
@@ -764,6 +768,7 @@ except PermissionError as error:
             return subprocess.Popen([sys.executable,str(script),name,str(root/'signed-inputs.json')],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,
                 text=True,user=65534,group=65534,extra_groups=[],cwd='/',env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8',
                     'PYTHONPATH':str(code)+':'+str(code/'hermes-source')+':/sdk','SSL_CERT_FILE':str(root/'ca.pem'),'HERMES_SAFE_MODE':'1',
+                    'CREDENTIALS_DIRECTORY':str(private/'installed-credentials'),
                     'OMP_NUM_THREADS':'2','OPENBLAS_NUM_THREADS':'1','HF_HUB_OFFLINE':'1','TRANSFORMERS_OFFLINE':'1'})
         async def done(process):
             await asyncio.wait_for(asyncio.to_thread(process.wait),15);error=process.stderr.read()
@@ -1120,6 +1125,105 @@ print('unprivileged-parent-refused')
                     cases.append('actual_root_owner_drops_to_installed_gateway_UID_for_native_read_only_CLI_account_check_and_finite_output_and_confirmed_reply_inspection_with_no_send_or_grant_creation')
                     cases.append('actual_owner_private_worker_rejects_bad_nsec_checksum_and_mismatched_native_public_identity_before_any_TLS_query_with_finite_nonprivate_diagnostic')
                     cases.append('actual_authenticated_root_parent_private_gateway_UID_owner_disposal_denies_active_grant_then_retains_idempotent_audited_tombstone_after_real_root_publication_withdrawal_without_credential_or_journal_bytes_returned')
+                    # Exercise the public factory and the unchanged production
+                    # serve loop with real systemd-style credential projection.
+                    initial_setup.gateway_configuration()
+                    buzz_owner_setup.configure('buzz',value)
+                    initial_setup.pair_gateway_sender('owner','buzz',peer,channel,'personal',allow_outbound_media=True)
+                    projected=private/'installed-credentials';projected.mkdir(mode=0o700);os.chown(projected,65534,65534)
+                    shutil.copyfile(saved_private,projected/'gateway-credentials')
+                    (projected/'gateway-credentials').chmod(0o600);os.chown(projected/'gateway-credentials',65534,65534)
+                    # Nostr timestamps have whole-second precision. Keep the
+                    # real publication's strict millisecond boundary intact;
+                    # create this new source after its first admissible second.
+                    await asyncio.sleep(1.05)
+                    inputs=json.loads(fixture.read_text());inputs['production-source']=signed(peer_scalar,'Actual production runtime goal')
+                    fixture.write_text(json.dumps(inputs));fixture.chmod(0o644)
+                    controller_store=MissionStore(root/'production-root-missions.db')
+                    controller=Controller(controller_store,'ws://127.0.0.1:1/fixture-not-inferred',{0})
+                    controller.gateway_uids={65534};controller.agent_uid=65533
+                    controller.gateway_policy=lambda:PreparedBuzzPolicy(trusted_json(etc/'gateways.json'))
+                    root_server=await asyncio.start_unix_server(root_client,path=SOCKET,limit=MAX_FRAME)
+                    control.chmod(0o660);os.chown(control,0,65534)
+                    artifact_token='private-fixture-production-file-capability';file_reads=[]
+                    file_bytes=b'%PDF-1.7\nActual production serve output fixture\n%%EOF\n'
+                    artifact_runner=web.AppRunner(artifact_app,access_log=None);await artifact_runner.setup()
+                    with socket.socket() as reserved:reserved.bind(('127.0.0.1',0));artifact_port=reserved.getsockname()[1]
+                    await web.TCPSite(artifact_runner,'127.0.0.1',artifact_port).start()
+                    controller.url='ws://127.0.0.1:'+str(artifact_port)+'/api/ws?token='+artifact_token
+                    controller_store.redactor=__import__('haos.redaction',fromlist=['Redactor']).Redactor([scalar,artifact_token])
+                    mode['name']='production';process=spawn('production')
+                    async def production_wait(predicate):
+                        async with asyncio.timeout(20):
+                            while not predicate():
+                                if process.poll() is not None:raise AssertionError('production worker exited: '+process.stderr.read())
+                                await asyncio.sleep(.05)
+                    def delivered():
+                        return controller_store.db.execute("SELECT COUNT(*) FROM gateway_outbox WHERE state='delivered'").fetchone()[0]
+                    async def production_stop():
+                        process.send_signal(__import__('signal').SIGTERM)
+                        _out,error=await asyncio.wait_for(asyncio.to_thread(process.communicate),10)
+                        assert process.returncode==0 and scalar not in error,error
+                    try:
+                        await production_wait(lambda:len(controller_store.list())==1 and delivered()>0)
+                        mid=controller_store.list()[0]['id'];assert controller_store.get(mid)['goal']=='Actual production runtime goal'
+                        assert controller_store.claim()['id']==mid;controller_store.session(mid,'production-live','stored-buzz-output')
+                        before=len(uploads)
+                        controller_store.settle(mid,'completed',result='Production runtime result.\nMEDIA:./result.pdf')
+                        await production_wait(lambda:len(uploads)==before+1 and controller_store.db.execute("SELECT COUNT(*) FROM gateway_outbox WHERE state!='delivered'").fetchone()[0]==0)
+                        assert len(file_reads)==1
+                        await production_stop();writes=len(outgoing);auth_before=len(auths)
+                        process=spawn('production');await production_wait(lambda:len(auths)>auth_before)
+                        await asyncio.sleep(1.2)
+                        assert len(controller_store.list())==1 and len(outgoing)==writes and len(file_reads)==1 and len(uploads)==before+1
+                        await production_stop()
+                        cases.append('actual_public_factory_and_unmodified_production_serve_run_under_gateway_UID_with_projected_private_credentials_real_TLS_receive_root_mission_export_upload_native_file_reply_and_ack_then_restart_without_duplicate_mission_export_upload_or_send')
+                    finally:
+                        if process.poll() is None:
+                            process.kill();_out,error=await asyncio.to_thread(process.communicate)
+                            assert scalar not in error and artifact_token not in error
+                            if error:sys.stderr.write(error[-4000:])
+                        root_server.close();await root_server.wait_closed();await artifact_runner.cleanup();controller_store.close()
+                    profiles_view=await asyncio.to_thread(buzz_owner_setup.inspect,'buzz','source-profiles')
+                    assert len(profiles_view['profiles'])==1
+                    sources_view=await asyncio.to_thread(buzz_owner_setup.inspect,'buzz','sources')
+                    target_event=inputs['production-source']['id']
+                    selected=[row for row in sources_view['sources'] if row['event_id']==target_event]
+                    assert len(selected)==1,{'matching_current_sources':len(selected)}
+                    assert any(not row['current_grant'] for row in sources_view['sources'])
+                    source_row=selected[0]
+                    assert source_row['current_grant'] is True and source_row['original_bytes_match_receipt'] is True
+                    assert 'Actual production runtime goal' not in json.dumps(sources_view)
+                    refused=await asyncio.to_thread(buzz_owner_setup.recover_source,'buzz',source_row,'purge-source','fixture active original',confirmed=True)
+                    assert refused=={'error':'authority-refused'},refused
+                    history_view=await asyncio.to_thread(buzz_owner_setup.inspect,'buzz','history')
+                    assert len(history_view['history'])==1 and history_view['history'][0]['reset_allowed'] is True
+                    # The same identity/profile intentionally retains the older
+                    # private fixture's cursor. A new owner grant must not erase
+                    # or silently rebind it during production daemon startup.
+                    old_cursor=history_view['history'][0]
+                    first_reset=await asyncio.to_thread(buzz_owner_setup.recover_source,'buzz',old_cursor,'reset-history','fixture inspected retained previous epoch',confirmed=True)
+                    assert first_reset['originals_and_previous_checkpoint_receipt_retained'] is True,first_reset
+                    history_view=await asyncio.to_thread(buzz_owner_setup.inspect,'buzz','history')
+                    assert history_view['history'][0]['reset_allowed'] is False
+                    initial_setup.pair_gateway_sender('owner','buzz',peer,channel,'personal',allow_outbound_media=True)
+                    history_view=await asyncio.to_thread(buzz_owner_setup.inspect,'buzz','history');cursor=history_view['history'][0]
+                    assert cursor['reset_allowed'] is True and cursor['state']=='grant-changed'
+                    reset=await asyncio.to_thread(buzz_owner_setup.recover_source,'buzz',cursor,'reset-history','fixture inspected new grant',confirmed=True)
+                    assert reset['originals_and_previous_checkpoint_receipt_retained'] is True,reset
+                    assert await asyncio.to_thread(buzz_owner_setup.recover_source,'buzz',cursor,'reset-history','fixture inspected new grant',confirmed=True)==reset
+                    sources_view=await asyncio.to_thread(buzz_owner_setup.inspect,'buzz','sources')
+                    selected=[row for row in sources_view['sources'] if row['event_id']==target_event];assert len(selected)==1
+                    source_row=selected[0]
+                    assert source_row['purge_allowed'] is True
+                    purged=await asyncio.to_thread(buzz_owner_setup.recover_source,'buzz',source_row,'purge-source','fixture inspected revoked original',confirmed=True)
+                    assert purged['tombstones_retained'] is True,purged
+                    assert await asyncio.to_thread(buzz_owner_setup.recover_source,'buzz',source_row,'purge-source','fixture inspected revoked original',confirmed=True)==purged
+                    after=await asyncio.to_thread(buzz_owner_setup.inspect,'buzz','sources')
+                    selected=[row for row in after['sources'] if row['event_id']==target_event];assert len(selected)==1
+                    assert selected[0]['purged'] is True and selected[0]['stored_bytes']==0
+                    cases.append('actual_root_parent_private_UID_source_inventory_and_disposal_refuse_active_grant_then_remove_original_and_payload_bearing_proof_after_withdrawal_with_audited_idempotent_tombstone')
+                    cases.append('actual_root_parent_private_UID_changed_grant_history_inspection_and_explicit_restart_preserve_originals_and_full_previous_checkpoint_with_no_network_or_automatic_old_cursor_rebind')
                 finally:
                     initial_setup.quiesce_for_setup=old_quiesce;gateway_setup.stopped_gateway=old_stopped
             finally:await public_runner.cleanup()
@@ -1134,7 +1238,8 @@ print('unprivileged-parent-refused')
         'agent_artifact_HTTP_endpoint_fixture':True,
         'actual_root_parent_gateway_UID_owner_account_inventory_and_disposal':True,
         'owner_service_stop_systemd_boundary_fixture':True,
-        'production_runtime_factory_owner_GUI_public_activation_live_inference_or_delivery':False},indent=2))
+        'actual_public_factory_and_production_serve':True,
+        'owner_GUI_live_inference_external_delivery_installed_OS_or_release_acceptance':False},indent=2))
 
 
 if __name__=='__main__':main()

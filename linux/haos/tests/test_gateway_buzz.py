@@ -26,11 +26,12 @@ def test_account_rejects_weak_or_out_of_range_keys_implicit_channels_external_pr
     with pytest.raises(ValueError):credentials({**account(),**change})
 
 
-def test_prepared_policy_requires_independent_exact_grants_without_public_activation():
+def test_native_policy_requires_independent_exact_grants_and_never_activates_unknown_plugins():
     config={'version':1,'connectors':[{'id':'buzz','platform':'buzz'}],'bindings':[{**binding(),'allow_media':True}]}
     assert PreparedBuzzPolicy(config).bindings['owner']['allow_media'] is True
-    with pytest.raises(ValueError):GatewayPolicy(config)
-    denied=PreparedBuzzPolicy({**config,'bindings':[]})
+    assert GatewayPolicy(config).bindings==PreparedBuzzPolicy(config).bindings
+    with pytest.raises(ValueError):GatewayPolicy({**config,'connectors':[{'id':'buzz','platform':'unreviewed-plugin'}]})
+    denied=GatewayPolicy({**config,'bindings':[]})
     with pytest.raises(PermissionError):denied.authorize('buzz',{'platform':'buzz','sender':'3'*64,
         'chat':binding()['chat'],'scope':scope(account()),'thread':'','message_id':'4'*64,'is_bot':False,'text':'untrusted'})
 

@@ -83,7 +83,12 @@ def native_authorization_prefilter(policy, connector, user_id, chat_id, *, threa
         and binding["scope"] == "" for binding in policy.bindings.values())
 
 
-def build_adapter(platform: str, credentials: dict, *, matrix_context=None, ntfy_context=None, homeassistant_context=None, irc_context=None, line_context=None, sms_context=None, email_context=None, feishu_context=None, dingtalk_context=None, a2a_context=None):
+def build_adapter(platform: str, credentials: dict, *, matrix_context=None, ntfy_context=None, homeassistant_context=None, irc_context=None, line_context=None, sms_context=None, email_context=None, feishu_context=None, dingtalk_context=None, a2a_context=None, buzz_context=None):
+    if platform=='buzz':
+        if not isinstance(buzz_context,dict) or set(buzz_context)!={'parent','connector','policy','inbox'}:
+            raise PermissionError('independent private Buzz context required')
+        from .gateway_buzz_profile import build
+        return build(credentials,**buzz_context)
     if platform=='a2a':
         if not isinstance(a2a_context,dict) or set(a2a_context)!={'parent','connector','policy','inbox'}:
             raise ValueError('A2A requires a private profile and exact independent owner authority')
@@ -205,6 +210,20 @@ def credential_redactor(credentials, policy):
     secrets=[item[key] for item in credentials['connectors'].values()
         for key in ('token','app_token','recovery_key','server_password','channel_password','nickserv_password','sasl_password','channel_secret','channel_access_token','auth_token','password','client_secret') if item.get(key)]
     for name,item in credentials['connectors'].items():
+        if policy.connectors[name]['platform']=='buzz':
+            values={item['private_key'],item.get('auth_tag','')}
+            # Decode native aliases only in the verified private runtime. The
+            # minimal owner/CI module must remain importable without Hermes.
+            if item['private_key'].startswith('nsec1'):
+                require_runtime_identity()
+                from plugins.platforms.buzz.nostr_auth import decode_private_key
+                values.add(format(decode_private_key(item['private_key']),'064x'))
+            if item.get('auth_tag'):
+                tag=json.loads(item['auth_tag']);values|={repr(tag),*[json.dumps(tag,ensure_ascii=mode) for mode in [True,False]]}
+            for _ in range(2):
+                values|={json.dumps(value,ensure_ascii=mode)[1:-1] for value in tuple(values) for mode in [True,False]}
+                values|={repr(value)[1:-1] for value in tuple(values)}
+            secrets.extend(values)
         if policy.connectors[name]['platform'] in {'line','sms'} and 'tls' in item:
             secrets.append(item['tls']['private_key'])
         if policy.connectors[name]['platform']=='a2a':
@@ -298,7 +317,7 @@ async def serve():
     inbox = RelayInbox(Path("/var/lib/haos-gateway/inbox.db"), redactor)
     native_inbox = None
     media_cache=None
-    if any(row["platform"] in {'discord','slack','mattermost','matrix','ntfy','homeassistant','irc','line','sms','email','feishu','dingtalk','a2a'} for row in policy.connectors.values()):
+    if any(row["platform"] in {'discord','slack','mattermost','matrix','ntfy','homeassistant','irc','line','sms','email','feishu','dingtalk','a2a','buzz'} for row in policy.connectors.values()):
         from .gateway_raw import NativeInbox
         native_inbox = NativeInbox(Path("/var/lib/haos-gateway/native-inbox.db"), redactor)
         from .gateway_media_relay import MediaCache
@@ -319,12 +338,18 @@ async def serve():
     tasks = []
     adapters = {}
     for connector in policy.connectors.values():
-        if connector['platform'] in {'homeassistant','irc','line','sms','email','feishu','dingtalk','a2a'} and not any(b['connector']==connector['id'] for b in policy.bindings.values()):
+        if connector['platform'] in {'homeassistant','irc','line','sms','email','feishu','dingtalk','a2a','buzz'} and not any(b['connector']==connector['id'] for b in policy.bindings.values()):
             logging.warning('Gateway connector remains inactive until exact owner pairing')
             continue
         context=None
-        if connector['platform'] in {'matrix','ntfy','homeassistant','irc','line','sms','email','feishu','dingtalk','a2a'}:
-            parent=Path('/var/lib/haos-gateway')/('profiles' if connector['platform'] in {'email','feishu','dingtalk','a2a'} else connector['platform']);parent.mkdir(mode=0o700,exist_ok=True)
+        if connector['platform']=='buzz':
+            channels=set(credentials['connectors'][connector['id']]['channels'])
+            granted={binding['chat'] for binding in policy.bindings.values() if binding['connector']==connector['id']}
+            if channels!=granted:
+                logging.warning('Buzz remains inactive until every selected channel has an exact owner grant')
+                continue
+        if connector['platform'] in {'matrix','ntfy','homeassistant','irc','line','sms','email','feishu','dingtalk','a2a','buzz'}:
+            parent=Path('/var/lib/haos-gateway')/('profiles' if connector['platform'] in {'email','feishu','dingtalk','a2a','buzz'} else connector['platform']);parent.mkdir(mode=0o700,exist_ok=True)
             context={'parent':parent,'connector':connector['id'],'policy':current_policy,'inbox':native_inbox}
         adapter = (build_adapter(connector["platform"], credentials["connectors"][connector["id"]],**{connector['platform']+'_context':context})
             if context else build_adapter(connector["platform"], credentials["connectors"][connector["id"]]))
@@ -342,6 +367,11 @@ async def serve():
                 logging.warning("Gateway message refused")
             return False
         adapter.set_durable_message_handler(receive)
+        if connector['platform']=='buzz':
+            # The pinned emitter checks this field before calling our durable
+            # handle_message override. Both point to the same independent
+            # admission; no native mission runner or plugin gets a callback.
+            adapter.set_message_handler(receive)
         def authorize(user_id, chat_type=None, chat_id=None, *, is_bot=False, thread_id=None, connector=connector):
             try:
                 current = current_policy()

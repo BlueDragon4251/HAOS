@@ -1,0 +1,78 @@
+name: HAOS native Buzz gateway contracts
+on:
+  pull_request:
+    paths: ['linux/haos/**', 'linux/image/Containerfile', '.github/workflows/haos-buzz-contracts.yml', 'upstream/UPSTREAM.lock']
+  push:
+    branches: ['agent/hermes-parity-mobile', 'agent/haos-foundation']
+    paths: ['linux/haos/**', 'linux/image/Containerfile', '.github/workflows/haos-buzz-contracts.yml', 'upstream/UPSTREAM.lock']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: buzz-contracts-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  native-buzz:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with: {python-version: '3.11'}
+      - name: Prepare exact frozen private Hermes SDK and public speech fixture
+        run: |
+          set -euo pipefail
+          python -m pip install uv
+          bash scripts/sync-upstream.sh
+          python linux/haos/runtime/prepare.py upstream/hermes-agent linux/haos/runtime
+          uv sync --project upstream/hermes-agent --frozen --python 3.11 --no-dev --extra web --extra messaging --extra anthropic --extra bedrock --extra vertex --extra azure-identity --extra matrix --extra voice --extra feishu --extra dingtalk
+          uv pip install --python upstream/hermes-agent/.venv/bin/python --require-hashes --no-deps -r linux/haos/runtime/requirements.txt
+          uv pip check --python upstream/hermes-agent/.venv/bin/python
+          upstream/hermes-agent/.venv/bin/python linux/haos/runtime/fetch_speech_fixture.py linux/haos "$RUNNER_TEMP/buzz-speech"
+          mkdir -p "$RUNNER_TEMP/buzz-contracts" "$RUNNER_TEMP/buzz-native"
+      - name: Build exact official CLI and verifier with frozen SDK locks and bounded ABI
+        run: |
+          set -euo pipefail
+          docker build -f linux/haos/runtime/buzz-build.Containerfile -t haos-buzz-contract-native .
+          HAOS_BUZZ_CONTAINER=$(docker create haos-buzz-contract-native)
+          trap 'docker rm -f "$HAOS_BUZZ_CONTAINER" >/dev/null' EXIT
+          docker cp "$HAOS_BUZZ_CONTAINER:/output/." "$RUNNER_TEMP/buzz-native/"
+          cp "$RUNNER_TEMP/buzz-native/source.json" "$RUNNER_TEMP/buzz-contracts/native-build-source.json"
+      - name: Actual native crypto and authenticated CLI HTTP protocol fixtures
+        run: |
+          set -euo pipefail
+          PYTHON="$PWD/upstream/hermes-agent/.venv/bin/python"
+          "$PYTHON" linux/haos/runtime/probe_buzz_crypto.py upstream/hermes-agent "$RUNNER_TEMP/buzz-native/haos-buzz-verify" "$RUNNER_TEMP/buzz-contracts/crypto.json"
+          "$PYTHON" linux/haos/runtime/probe_buzz_cli.py upstream/hermes-agent "$RUNNER_TEMP/buzz-native/buzz" "$RUNNER_TEMP/buzz-native/haos-buzz-verify" "$RUNNER_TEMP/buzz-contracts/cli.json"
+          "$PYTHON" linux/haos/runtime/probe_buzz_media_cli.py upstream/hermes-agent "$RUNNER_TEMP/buzz-native/buzz" "$RUNNER_TEMP/buzz-native/haos-buzz-verify" "$RUNNER_TEMP/buzz-contracts/media-cli.json"
+      - name: Actual offline installed UID TLS custody controller production daemon and owner handoffs
+        run: |
+          set -euo pipefail
+          SDK_SITE="$PWD/upstream/hermes-agent/.venv/lib/python3.11/site-packages"
+          docker run --rm --network none --security-opt no-new-privileges --pids-limit 128 --memory 1g \
+            -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
+            -v "$PWD/linux/haos/probes/probe_buzz_socket_process.py:/probe.py:ro" \
+            -v "$RUNNER_TEMP/buzz-native/buzz:/public-bin/buzz:ro" \
+            -v "$RUNNER_TEMP/buzz-native/haos-buzz-verify:/public-bin/haos-buzz-verify:ro" \
+            -v "$RUNNER_TEMP/buzz-native/source.json:/public-build/source.json:ro" \
+            -v "$RUNNER_TEMP/buzz-speech/reference.flac:/public-media/reference.flac:ro" \
+            -v "$RUNNER_TEMP/buzz-speech/model:/public-model:ro" \
+            -e HAOS_DISPOSABLE_BUZZ_SOCKET_PROCESS=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /probe.py > "$RUNNER_TEMP/buzz-contracts/installed-process.json"
+          cat "$RUNNER_TEMP/buzz-contracts/installed-process.json"
+      - name: Actual Tk desktop and compact owner forms with explicit component handoff fixtures
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb python3-tk
+          for screen in 1440x1000x24 390x640x24; do
+            xvfb-run -a -s "-screen 0 $screen" python linux/haos/runtime/probe_buzz_owner_gui.py linux/haos "$RUNNER_TEMP/buzz-contracts/gui-$screen.json"
+          done
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: native-buzz-contracts-${{ github.sha }}
+          path: ${{ runner.temp }}/buzz-contracts/
+          if-no-files-found: error
+          retention-days: 7

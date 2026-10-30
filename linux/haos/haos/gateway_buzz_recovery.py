@@ -1,9 +1,50 @@
 """Stopped-service owner inspection; no network or message-send capability."""
 import time
+import math
 
 from .gateway import GatewayPolicy,Conflict,digest
 from .gateway_buzz import HEX
 from .gateway_buzz_delivery import validate
+
+
+def transport(inbox):
+    if not inbox.db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='buzz_profile_status'").fetchone():return []
+    states={'created','connecting','connected-ws','connected-poll','disconnected','closed','revoked',
+        'authentication-refused','identity-refused','rate-limited','transport-unavailable','source-unavailable','storage-unavailable'}
+    result=[]
+    for record in inbox.db.execute('SELECT connector,status,updated_at,next_attempt FROM buzz_profile_status ORDER BY updated_at DESC LIMIT 64'):
+        row=dict(record)
+        if (not isinstance(row['connector'],str) or not 1<=len(row['connector'])<=128 or row['status'] not in states
+                or any(type(row[key]) not in {int,float} or not math.isfinite(row[key]) or row[key]<0 for key in ['updated_at','next_attempt'])):
+            raise Conflict('damaged private Buzz transport status')
+        result.append({'platform':'buzz',**row})
+    return result
+
+
+def retry_auth(inbox,policy,value,request):
+    from .gateway_buzz import credentials
+    if (not isinstance(policy,GatewayPolicy) or not isinstance(request,dict)
+            or set(request)!={'connector','owner_uid','note_sha256','confirmed'} or request['confirmed'] is not True
+            or not isinstance(request['connector'],str) or policy.connectors.get(request['connector'],{}).get('platform')!='buzz'
+            or type(request['owner_uid']) is not int or not 0<=request['owner_uid']<2**32-1
+            or not isinstance(request['note_sha256'],str) or not HEX.fullmatch(request['note_sha256'])):
+        raise PermissionError('explicit current Buzz account authentication recheck required')
+    account=digest([request['connector'],credentials(value)]);db=inbox.db;changed=0
+    db.execute('BEGIN IMMEDIATE')
+    try:
+        if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='buzz_profile_status'").fetchone():
+            changed=db.execute("UPDATE buzz_profile_status SET status='created',updated_at=? WHERE connector=? AND credential_scope=? AND status IN ('authentication-refused','identity-refused')",
+                (time.time(),request['connector'],account)).rowcount
+        db.execute('''CREATE TABLE IF NOT EXISTS buzz_auth_owner_events(
+            connector TEXT NOT NULL,credential_scope TEXT NOT NULL,owner_uid INTEGER NOT NULL,note_sha256 TEXT NOT NULL,
+            changed INTEGER NOT NULL,policy_sha256 TEXT NOT NULL,created_at REAL NOT NULL)''')
+        db.execute('INSERT INTO buzz_auth_owner_events VALUES(?,?,?,?,?,?,?)',(request['connector'],account,
+            request['owner_uid'],request['note_sha256'],changed,digest([policy.publication,policy.connectors,policy.bindings]),time.time()))
+        db.execute('COMMIT')
+    except BaseException:
+        if db.in_transaction:db.execute('ROLLBACK')
+        raise
+    return {'connector':request['connector'],'authentication_blocks_cleared':changed,'network_requested':False,'message_sent':False}
 
 
 def snapshot(row):

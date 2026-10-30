@@ -3,6 +3,7 @@
   "commit": "1eb67bb525d66448b56d79f98c4ba0e2188b44c5",
   "url": "https://api.github.com/repos/block/buzz/tarball/1eb67bb525d66448b56d79f98c4ba0e2188b44c5",
   "archive_sha256": "86edc7cd6f3a3455e9667e59086984a09718e376bc46135dfb69220503c9f0cd",
+  "archive_size": 50978319,
   "official_lock_sha256": "ddbb497947a853648720796b2e02246e654e75a3a66ba0635ebc3a52556851f2",
   "builder_image": "rust@sha256:ff521445a372125ed4f76e1453a1f8098f2d05332d1601d30db1c1f62757e730",
   "rust_version": "1.98.1",

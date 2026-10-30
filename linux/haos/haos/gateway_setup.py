@@ -357,6 +357,24 @@ def owner_gateway(args):
         audit("gateway." + args.gateway_action, {})
         return {"action": args.gateway_action}
     if args.gateway_action=='matrix-devices':return owner_matrix_devices(args.connector,args.sender)
+    if args.gateway_action in {'buzz-source-profiles','buzz-sources','buzz-history','purge-buzz-source','reset-buzz-history'}:
+        from .buzz_owner_setup import inspect,recover_source
+        if args.gateway_action=='buzz-source-profiles':return inspect(args.connector,'source-profiles')
+        if args.gateway_action in {'buzz-sources','buzz-history'}:
+            return inspect(args.connector,'sources' if args.gateway_action=='buzz-sources' else 'history',profile=args.profile)
+        row={'profile':args.profile,'snapshot_sha256':args.snapshot_sha256}
+        if args.gateway_action=='purge-buzz-source':row['id']=args.id
+        else:row['channel']=args.channel
+        return recover_source(args.connector,row,'purge-source' if args.gateway_action=='purge-buzz-source' else 'reset-history',args.note,confirmed=args.confirm_inspected)
+    if args.gateway_action in {'buzz-account','buzz-outputs','buzz-outgoing','retry-buzz-auth','buzz-recover-upload','approve-buzz-retry'}:
+        from .buzz_owner_setup import inspect,retry_auth,recover_upload,approve_reply
+        if args.gateway_action in {'buzz-account','buzz-outputs','buzz-outgoing'}:
+            return inspect(args.connector,{'buzz-account':'account','buzz-outputs':'outputs','buzz-outgoing':'outgoing'}[args.gateway_action])
+        if args.gateway_action=='retry-buzz-auth':return retry_auth(args.connector,args.note,confirmed=args.confirm_inspected)
+        if args.gateway_action=='buzz-recover-upload':
+            return recover_upload(args.connector,{'id':args.id,'snapshot_sha256':args.snapshot_sha256},args.upload_action,args.note,confirmed=args.confirm_inspected)
+        return approve_reply(args.connector,{'connector':args.connector,'delivery_id':args.delivery_id,'attempt':args.attempt,
+            'snapshot_sha256':args.snapshot_sha256},args.note,confirmed=args.confirm_inspected,confirmed_not_delivered=args.confirm_not_delivered)
     if args.gateway_action=='email-account':return owner_email_account(args.connector)
     if args.gateway_action in {'a2a-peer','a2a-remove-peer'}:
         from .a2a_owner_setup import set_peer,remove_peer
@@ -379,7 +397,7 @@ def owner_gateway(args):
         selected=[row for row in inventory['tasks'] if (row['profile'],row['peer_journal'],row['task_id'],row['snapshot_sha256'])==
             (args.profile,args.peer_journal,args.task_id,args.snapshot_sha256)]
         if len(selected)!=1:raise ValueError('exact current inspected snapshot on the selected A2A inventory page required')
-        return recover(args.connector,selected[0],args.action,args.note,confirmed=args.confirm_inspected)
+        return recover(args.connector,selected[0],args.recovery_action,args.note,confirmed=args.confirm_inspected)
     if args.gateway_action=='dingtalk-account':
         from .dingtalk_owner_setup import inspect
         return inspect(args.connector)
@@ -406,6 +424,15 @@ def owner_gateway(args):
             peer=input('Exact named peer: ');token=getpass.getpass('Private random peer bearer token: ')
             certificate=input('Trusted certificate chain PEM path: ');key=input('Private TLS key PEM path: ')
             return save_account(args.connector,{'agent_name':agent,'public_url':url,'bind_host':host,'port':int(port),'public_listener':public},peer,token,certificate,key)
+        if args.platform=='buzz':
+            from .buzz_owner_setup import configure
+            value={'relay_url':input('Exact HTTPS Buzz relay origin: '),'public_key':input('Expected public Nostr hex identity: '),
+                'private_key':getpass.getpass('Dedicated private Nostr hex/nsec key: '),
+                'channels':input('Exact channel UUIDs separated by spaces: ').split(),
+                'attachment_origins':input('Explicit optional foreign HTTPS attachment origins separated by spaces: ').split()}
+            auth=getpass.getpass('Optional private NIP-OA auth JSON array; empty omits: ')
+            if auth:value['auth_tag']=auth
+            return configure(args.connector,value)
         if args.platform=='dingtalk':
             from .dingtalk_owner_setup import configure
             return configure(args.connector,{'client_id':input('Exact DingTalk Client ID / AppKey: '),
@@ -544,7 +571,7 @@ def owner_gateway(args):
             return pair(args.binding,args.connector,args.sender,args.chat,args.identity,args.capabilities,
                 allow_media=args.allow_media,allow_voice=args.allow_voice,allow_video=args.allow_video,
                 allow_outbound_media=args.allow_outbound_media,allow_callback=getattr(args,'allow_callback',False))
-        if selected and selected['platform'] in {'email','feishu','dingtalk'}:
+        if selected and selected['platform'] in {'email','feishu','dingtalk','buzz'}:
             from .initial_setup import pair_gateway_sender
             return pair_gateway_sender(args.binding,args.connector,args.sender,args.chat,args.identity,
                 tuple(args.capabilities),scope=args.scope,thread=args.thread,require_mention=not getattr(args,'no_require_mention',False),

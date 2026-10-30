@@ -633,6 +633,61 @@ def test_actual_feishu_owner_setup_pairing_rotation_and_cross_uid_denial(tmp_pat
     assert value['app_secret'] not in str(audit) and any(event[0]=='setup.gateway-pair' for event in audit)
 
 
+def test_actual_buzz_owner_publication_pairing_rotation_and_foreign_UID_denial(public_build_directory,monkeypatch):
+    from haos import initial_setup,gateway_setup,owner,buzz_owner_setup
+    from haos.gateway_buzz import scope
+    assert os.geteuid()==0,'actual root publication and kernel UID gates required'
+    public_build_directory.chmod(0o755)
+    config=public_build_directory/'buzz-configuration';config.mkdir(mode=0o755)
+    original_load,original_persist=gateway_setup.load,gateway_setup.persist
+    monkeypatch.setattr(gateway_setup,'load',lambda *args:original_load(config))
+    monkeypatch.setattr(gateway_setup,'persist',lambda p,c:original_persist(p,c,config=config,gid=65534))
+    # Only service control and audit sink are component fixtures. Files, modes,
+    # publication/grant renewal and the foreign process's kernel UID are real.
+    monkeypatch.setattr(initial_setup,'quiesce_for_setup',lambda **kwargs:None)
+    monkeypatch.setattr(gateway_setup,'stopped_gateway',lambda:None)
+    audit=[];monkeypatch.setattr(owner,'audit',lambda action,fields:audit.append((action,fields)))
+    value={'private_key':'1'*64,'public_key':'2'*64,'relay_url':'https://buzz.fixture.invalid',
+        'channels':['01234567-89ab-4cde-8012-3456789abcde'],'attachment_origins':[]}
+    canary=config/'owner-recovery-canary';canary.write_bytes(b'preserve existing owner recovery');canary.chmod(0o600)
+    assert buzz_owner_setup.configure('buzz-main',value)['sender_pairing_required'] is True
+    assert stat.S_IMODE((config/'gateway-credentials').stat().st_mode)==0o600
+    assert stat.S_IMODE((config/'gateways.json').stat().st_mode)==0o640
+    assert (config/'gateways.json').stat().st_gid==65534
+    assert value['private_key'] not in (config/'gateways.json').read_text()
+    with pytest.raises(ValueError):buzz_owner_setup.configure('duplicate',value)
+    with pytest.raises(ValueError):initial_setup.pair_gateway_sender('owner','buzz-main',value['public_key'],value['channels'][0],'personal')
+    initial_setup.pair_gateway_sender('owner','buzz-main','3'*64,value['channels'][0],'personal',
+        thread='',allow_media=True,allow_outbound_media=True,require_mention=True)
+    policy,private=original_load(config);binding=policy['bindings'][0]
+    assert binding['scope']==scope(value) and binding['since']>0 and len(binding['generation'])==64
+    assert binding['allow_media'] is True and binding['allow_outbound_media'] is True and binding['allow_voice'] is False
+    metadata=initial_setup.gateway_configuration()
+    assert metadata['buzz']['buzz-main']['saved_private_key'] is True and value['private_key'] not in str(metadata)
+    pid=os.fork()
+    if pid==0:
+        try:
+            os.setgroups([]);os.setgid(65534);os.setuid(65534)
+            assert 'buzz-main' in (config/'gateways.json').read_text()
+            for action in [lambda:buzz_owner_setup.configure('buzz-main',value),lambda:buzz_owner_setup.saved('buzz-main'),
+                    lambda:buzz_owner_setup.inspect('buzz-main'),lambda:buzz_owner_setup.retry_auth('buzz-main','fixture',confirmed=True),
+                    lambda:buzz_owner_setup.recover_upload('buzz-main',{},'purge-upload','fixture',confirmed=True),
+                    lambda:initial_setup.pair_gateway_sender('owner','buzz-main','3'*64,value['channels'][0],'personal')]:
+                try:action()
+                except PermissionError:continue
+                raise AssertionError('foreign UID entered Buzz owner authority')
+            try:(config/'gateway-credentials').read_bytes()
+            except PermissionError:pass
+            else:raise AssertionError('gateway UID read root-private credential publication')
+            os._exit(0)
+        except BaseException:os._exit(1)
+    assert os.waitpid(pid,0)[1]==0
+    buzz_owner_setup.configure('buzz-main',{**value,'private_key':'4'*64})
+    assert original_load(config)[0]['bindings']==[]
+    assert canary.read_bytes()==b'preserve existing owner recovery'
+    assert any(action=='setup.gateway-pair' for action,_ in audit)
+
+
 def test_actual_dingtalk_owner_setup_pairing_rotation_and_cross_uid_denial(tmp_path,monkeypatch):
     from haos import initial_setup,gateway_setup,owner,dingtalk_owner_setup
     from haos.gateway_dingtalk import scope

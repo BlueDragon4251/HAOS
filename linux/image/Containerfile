@@ -4,12 +4,19 @@
 # the shell tarball for the same architecture next to it:
 #
 #   podman build -f linux/image/Containerfile --build-arg SHELL_TARBALL=herald-os-linux.tar.gz -t herald-os .
+FROM python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 AS buzz-python
+FROM rust@sha256:ff521445a372125ed4f76e1453a1f8098f2d05332d1601d30db1c1f62757e730 AS buzz-native
+COPY --from=buzz-python /usr/local /usr/local
+COPY linux/haos/runtime /haos-runtime
+RUN ldconfig && python3 /haos-runtime/build_buzz.py --output /output
+
 FROM quay.io/fedora/fedora-bootc:44
 
 ARG SHELL_TARBALL=herald-os-linux.tar.gz
 COPY linux /tmp/herald-os/linux
 COPY ${SHELL_TARBALL} /tmp/herald-os/shell.tar.gz
 COPY upstream/hermes-agent /usr/lib/haos/hermes
+COPY --from=buzz-native /output /usr/lib/haos/buzz
 
 RUN bash /tmp/herald-os/linux/image/packages.sh --image /tmp/herald-os/shell.tar.gz \
  && bash /tmp/herald-os/linux/haos/build-runtime.sh \

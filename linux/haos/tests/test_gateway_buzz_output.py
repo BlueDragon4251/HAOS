@@ -126,3 +126,22 @@ def test_upload_disposal_requires_grant_withdrawal_and_retains_inspected_tombsto
     view=inventory(adapter._haos_native.inbox,policy)['outputs'][0]
     assert view['state']=='purged' and view['source_bytes']==view['stored_bytes']==0
     assert first['tombstones_retained'] is True and first['network_requested'] is False
+
+
+def test_inspected_auth_recheck_clears_only_saved_account_blocks_and_preserves_rate_deadline(retained):
+    from haos.gateway_buzz_recovery import retry_auth,transport
+    import time
+    output,_,_,adapter=retained;db=output.db;policy=adapter._haos_native.policy();deadline=time.time()+3600
+    account=digest(['buzz',adapter._haos_buzz_value])
+    db.execute('CREATE TABLE buzz_profile_status(identity TEXT PRIMARY KEY,connector TEXT,credential_scope TEXT,status TEXT,updated_at REAL,next_attempt REAL)')
+    for identity,scope,status in [('a',account,'authentication-refused'),('b',account,'identity-refused'),
+            ('c','e'*64,'authentication-refused'),('d',account,'rate-limited')]:
+        db.execute('INSERT INTO buzz_profile_status VALUES(?,?,?,?,?,?)',(identity,'buzz',scope,status,123,deadline))
+    request={'connector':'buzz','owner_uid':1000,'note_sha256':'f'*64,'confirmed':True}
+    result=retry_auth(adapter._haos_native.inbox,policy,adapter._haos_buzz_value,request)
+    assert result['authentication_blocks_cleared']==2 and result['network_requested'] is False and result['message_sent'] is False
+    assert [row[0] for row in db.execute('SELECT status FROM buzz_profile_status ORDER BY identity')]==[
+        'created','created','authentication-refused','rate-limited']
+    assert all(row[0]==deadline for row in db.execute('SELECT next_attempt FROM buzz_profile_status'))
+    assert len(transport(adapter._haos_native.inbox))==4
+    assert db.execute('SELECT owner_uid,changed FROM buzz_auth_owner_events').fetchone()[:]==(1000,2)
