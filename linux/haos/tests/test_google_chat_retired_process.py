@@ -90,3 +90,23 @@ def test_historical_status_reports_actual_published_grants_as_information_withou
     with pytest.raises(ValueError):response(value,'tokens')
     value['active_authorization_returned']=True
     with pytest.raises(ValueError):response(value,'tokens',policy=selected_policy)
+
+
+@pytest.mark.parametrize('case',['foreign-scope','foreign-project','api-use','verified','private-client','private-payload'])
+def test_historical_rejected_token_metadata_cannot_claim_verified_user_api_authority_or_private_client_material(case):
+    # Actual capsule construction is covered by existing SQLite tests; this
+    # response contract intentionally exercises independently forged metadata.
+    app=selected();public=configuration();public['installed'].pop('client_secret')
+    row={'id':'a'*64,'pending_id':'b'*64,'account_scope':account_scope(app['identity']),'subject_expected':'users/123',
+        'client_sha256':'c'*64,'tokens_sha256':'d'*64,'state':'rejected','created_at':1,'origin':'enrollment','public_client':public,
+        'stored_bytes':100,'has_refresh_token':True,'actual_user_verified':False,'api_use_authorized':False,
+        'remote_revocation_verified':False,'private_credentials_returned':False}
+    if case=='foreign-scope':row['account_scope']='google-chat:'+'f'*64
+    elif case=='foreign-project':row['public_client']['installed']['project_id']='foreign-project'
+    elif case=='api-use':row['api_use_authorized']=True
+    elif case=='verified':row['actual_user_verified']=True
+    elif case=='private-client':row['public_client']['installed']['client_secret']='private-fixture-material'
+    else:row['tokens']={'refresh_token':'private-fixture-material'}
+    row['snapshot_sha256']=digest(row)
+    value={'account':app,'active_authorization_returned':False,'result':{'quarantines':[row],'history_truncated':False,'network_requested':False,'private_credentials_returned':False}}
+    with pytest.raises(ValueError):response(value,'quarantines')

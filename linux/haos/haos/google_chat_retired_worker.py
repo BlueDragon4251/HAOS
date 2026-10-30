@@ -40,14 +40,14 @@ def main():
     action=request['action'];params=request['params']
     if action=='profiles':
         if params:raise ValueError('historical profile inventory takes no selector')
-    elif action=='tokens':
+    elif action in {'tokens','quarantines'}:
         if set(params)!={'profile'}:raise ValueError('one exact historical profile required')
         profile_name(params['profile'])
     else:
-        if (set(params)!={'profile','identity_sha256','id','generation','owner_uid','note_sha256','confirmed'}
-                or params['owner_uid']!=request['owner_uid'] or params['confirmed'] is not True
-                or any(not isinstance(params[k],str) or not HEX.fullmatch(params[k]) for k in ['identity_sha256','id','note_sha256'])
-                or type(params['generation']) is not int or not 1<=params['generation']<2**53):
+        required={'profile','identity_sha256','id','owner_uid','note_sha256','confirmed'}|({'generation'} if action=='revoke-token' else {'snapshot_sha256'})
+        if (set(params)!=required or params['owner_uid']!=request['owner_uid'] or params['confirmed'] is not True
+                or any(not isinstance(params[k],str) or not HEX.fullmatch(params[k]) for k in ['identity_sha256','id','note_sha256',*(['snapshot_sha256'] if action=='dispose-capsule' else [])])
+                or action=='revoke-token' and (type(params['generation']) is not int or not 1<=params['generation']<2**53)):
             raise PermissionError('closed explicitly confirmed historical token withdrawal required')
         profile_name(params['profile'])
     def current():
@@ -89,8 +89,8 @@ def main():
                 if load(profile)!=identity:raise PermissionError('historical app identity changed during Owner action')
             selected();database=profile/'user-oauth.sqlite'
             if not database.exists():
-                if action!='tokens':raise PermissionError('retained historical user token required')
-                value={'tokens':[],'history_truncated':False,'network_requested':False,'private_credentials_returned':False}
+                if action not in {'tokens','quarantines'}:raise PermissionError('retained historical user token required')
+                value={action:[],'history_truncated':False,'network_requested':False,'private_credentials_returned':False}
             else:
                 from .gateway_raw import NativeInbox
                 from .gateway_google_chat_oauth import OAuthStore
@@ -101,12 +101,20 @@ def main():
                     for token in value['tokens']:
                         token['current_file_grants']=file_grants(published,identity,token['subject'])
                         token['snapshot_sha256']=digest({k:v for k,v in token.items() if k!='snapshot_sha256'})
+                elif action=='quarantines':
+                    from .gateway_google_chat_oauth_quarantine import inventory_identity
+                    value=inventory_identity(store,identity)
                 else:
                     if params['identity_sha256']!=account['identity_sha256']:raise PermissionError('historical app changed after Owner inspection')
-                    from .gateway_google_chat_oauth_revoke import revoke_retired
                     import asyncio
-                    decision={k:params[k] for k in ['id','generation','owner_uid','note_sha256','confirmed']}
-                    value=asyncio.run(revoke_retired(store,identity,decision,selected))
+                    if action=='revoke-token':
+                        from .gateway_google_chat_oauth_revoke import revoke_retired
+                        decision={k:params[k] for k in ['id','generation','owner_uid','note_sha256','confirmed']}
+                        value=asyncio.run(revoke_retired(store,identity,decision,selected))
+                    else:
+                        from .gateway_google_chat_oauth_quarantine import dispose_retired
+                        decision={k:params[k] for k in ['id','snapshot_sha256','owner_uid','note_sha256','confirmed']}
+                        value=asyncio.run(dispose_retired(store,identity,decision,selected))
             selected();result={'account':account,'result':value,'active_authorization_returned':False}
         current();checked=response(result,action,request=params,policy=current_policy());encoded=json.dumps(checked,ensure_ascii=False,allow_nan=False)
         if len(encoded.encode())>262144 or redactor.text(encoded)!=encoded:raise PermissionError('bounded nonprivate historical Google response required')

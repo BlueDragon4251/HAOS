@@ -15,6 +15,8 @@ v=json.load(sys.stdin);action=v['action'];params=v.get('params',{})
 try:
  if action=='profiles':result=owner.profiles()
  elif action=='tokens':result=owner.tokens(**params)
+ elif action=='quarantines':result=owner.quarantines(**params)
+ elif action=='dispose':result=owner.dispose(**params)
  elif action=='revoke':result=owner.revoke(**params)
  elif action=='hold':
   import subprocess
@@ -48,10 +50,16 @@ except PermissionError:print(json.dumps({'error':'root-backend-authority-refused
     publication.unlink();secret.unlink()
     assert call('tokens',{'profile':account['profile']})['result']['tokens'][0]['id']==row['id'] and requests==before
     cases.append('actual_Root_historical_token_metadata_remains_available_with_active_config_and_all_service_account_credentials_absent')
+    quarantined=call('quarantines',{'profile':account['profile']})
+    assert quarantined['account']==account and len(quarantined['result']['quarantines'])==1 and requests==before
+    capsule=quarantined['result']['quarantines'][0]
+    assert not capsule['api_use_authorized'] and not capsule['actual_user_verified'] and capsule['state']=='rejected'
+    cases.append('actual_Root_historical_rejected_token_inventory_without_service_account_credentials_exposes_only_nonactive_capsule_metadata_and_never_grants_API_use')
     site=runtime/'lib/python3.11/site-packages/fixture.pth';installed=site.read_text()
     site.write_text('/usr/lib/haos\n')
     try:
         assert call('profiles')['profiles']==[account]
+        assert call('quarantines',{'profile':account['profile']})['result']['quarantines'][0]['id']==capsule['id']
         assert call('tokens',{'profile':account['profile']})['result']['tokens'][0]['id']==row['id'] and requests==before
     finally:site.write_text(installed)
     cases.append('actual_fixed_Root_private_UID_historical_metadata_with_real_retained_OAuth_tokens_runs_without_optional_SDK_or_Hermes_source_on_runtime_path_and_without_network')
@@ -110,6 +118,22 @@ print('denied')
     assert call('tokens',{'profile':account['profile']})=={'error':'root-backend-authority-refused'} and requests==before
     manifest.unlink()
     cases.append('actual_Root_historical_withdrawal_requires_explicit_confirmation_exact_app_snapshot_and_no_pending_publication_before_any_HTTP')
+    disposal={'account':account,'row':capsule,'note':'explicit rejected historical fixture disposal','confirmed':True}
+    assert call('dispose',{**disposal,'confirmed':False})=={'error':'root-backend-authority-refused'} and requests==before
+    changed={**capsule,'snapshot_sha256':'e'*64}
+    assert call('dispose',{**disposal,'row':changed})=={'error':'authority-refused'} and requests==before
+    disposed=call('dispose',disposal)['result']
+    assert disposed['remote_revocation_verified'] and disposed['network_requested'] and not disposed['api_use_authorized'] and not disposed['message_sent']
+    assert requests==before+['revoke']
+    replay=call('dispose',disposal)['result']
+    assert replay['receipt']==disposed['receipt'] and replay['remote_revocation_verified'] and not replay['network_requested']
+    assert requests==before+['revoke']
+    with __import__('sqlite3').connect(database) as db:
+        assert db.execute('SELECT tokens,state FROM google_chat_oauth_quarantine').fetchone()==('{}','revoked-remote')
+    cleaned=call('quarantines',{'profile':account['profile']})['result']['quarantines'][0]
+    assert cleaned['stored_bytes']==0 and not cleaned['api_use_authorized'] and cleaned['remote_revocation_verified']
+    cases.append('actual_Root_historical_rejected_token_disposal_requires_exact_snapshot_confirmation_then_one_fixed_TLS_revocation_before_private_capsule_compaction_and_replay_never_reposts_or_authorizes_API_use')
+    before=list(requests)
     result=call('revoke',params);revoked=result['result']
     assert revoked['locally_revoked'] and revoked['remote_revocation_verified'] and revoked['network_requested'] and not revoked['message_sent']
     assert requests==before+['revoke']

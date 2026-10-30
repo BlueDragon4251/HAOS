@@ -14,9 +14,15 @@ from .gateway_google_chat_oauth_revoke import REVOKE_URI
 
 
 def checked(record,account):
-    row=dict(record)
+    from .gateway_google_chat_identity import descriptor
+    return checked_identity(record,descriptor(account))
+
+
+def checked_identity(record,identity):
+    from .gateway_google_chat_identity import validate,account_scope
+    identity=validate(identity);row=dict(record)
     if (any(not isinstance(row[k],str) or not HEX.fullmatch(row[k]) for k in ['id','pending_id','client_sha256','tokens_sha256','note_sha256'])
-            or row['account_scope']!=scope(account) or row.get('origin','enrollment') not in {'enrollment','refresh'}
+            or row['account_scope']!=account_scope(identity) or row.get('origin','enrollment') not in {'enrollment','refresh'}
             or row['id']!=digest([row['pending_id'],row['tokens_sha256']] if row.get('origin','enrollment')=='enrollment' else ['refresh',row['pending_id'],row['tokens_sha256']])
             or row['state'] not in {'rejected','revocation-pending','revoked-remote'}
             or type(row['owner_uid']) is not int or not 0<=row['owner_uid']<2**32-1
@@ -33,7 +39,7 @@ def checked(record,account):
     from .gateway_google_chat_oauth import AUTH_URI,TOKEN_URI
     import re
     info=public['installed']
-    if (info['project_id']!=account['service_account']['project_id'] or not isinstance(info['client_id'],str)
+    if (info['project_id']!=identity['project_id'] or not isinstance(info['client_id'],str)
             or not re.fullmatch('[0-9]{1,32}-[A-Za-z0-9_-]{1,128}\\.apps\\.googleusercontent\\.com',info['client_id'])
             or info['auth_uri']!=AUTH_URI or info['token_uri']!=TOKEN_URI
             or info['auth_provider_x509_cert_url']!='https://www.googleapis.com/oauth2/v1/certs' or info['redirect_uris']!=['http://localhost']):
@@ -48,7 +54,12 @@ def checked(record,account):
 
 
 def view(record,account):
-    row,tokens,public=checked(record,account)
+    from .gateway_google_chat_identity import descriptor
+    return view_identity(record,descriptor(account))
+
+
+def view_identity(record,identity):
+    row,tokens,public=checked_identity(record,identity)
     value={k:row[k] for k in ['id','pending_id','account_scope','subject_expected','client_sha256','tokens_sha256','state','created_at']}
     value.update(origin=row.get('origin','enrollment'),public_client=public,stored_bytes=len(row['tokens'].encode()) if tokens else 0,has_refresh_token=bool(tokens.get('refresh_token')),
         actual_user_verified=False,api_use_authorized=False,remote_revocation_verified=row['state']=='revoked-remote',private_credentials_returned=False)
@@ -56,9 +67,22 @@ def view(record,account):
 
 
 def inventory(store,account):
-    private();exists=store.db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='google_chat_oauth_quarantine'").fetchone()
-    rows=store.db.execute('SELECT * FROM google_chat_oauth_quarantine WHERE account_scope=? ORDER BY created_at DESC LIMIT 65',(scope(account),)).fetchall() if exists else []
-    return {'quarantines':[view(row,account) for row in rows[:64]],'history_truncated':len(rows)>64,'network_requested':False,'private_credentials_returned':False}
+    from .gateway_google_chat_identity import descriptor
+    return inventory_identity(store,descriptor(account))
+
+
+def inventory_identity(store,identity):
+    private()
+    from .gateway_google_chat_identity import validate,account_scope
+    identity=validate(identity);exists=store.db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='google_chat_oauth_quarantine'").fetchone()
+    rows=store.db.execute('SELECT * FROM google_chat_oauth_quarantine WHERE account_scope=? ORDER BY created_at DESC LIMIT 65',(account_scope(identity),)).fetchall() if exists else []
+    from .redaction import Redactor
+    for row in rows[:64]:
+        _record,tokens,_public=checked_identity(row,identity)
+        aliases=Redactor([*store.inbox.redactor.secrets,*tokens.values()]).secrets
+        if len(aliases)>4096 or sum(len(item) for item in aliases)>8*1024*1024:raise Conflict('private rejected-token redaction capacity reached')
+        store.inbox.redactor.secrets=aliases
+    return {'quarantines':[view_identity(row,identity) for row in rows[:64]],'history_truncated':len(rows)>64,'network_requested':False,'private_credentials_returned':False}
 
 
 async def dispose(store,policy,connector,account,request,before_io,*,http=None):
@@ -70,10 +94,29 @@ async def dispose(store,policy,connector,account,request,before_io,*,http=None):
     def current():
         private();before_io()
         if policy().connectors.get(connector,{}).get('platform')!='google_chat':raise PermissionError('selected Google Owner connector required')
+    from .gateway_google_chat_identity import descriptor
+    current()
+    return await _dispose_identity(store,descriptor(account),request,current,http=http)
+
+
+async def dispose_retired(store,identity,request,before_io,*,http=None):
+    private();fields={'id','snapshot_sha256','owner_uid','note_sha256','confirmed'}
+    if (not isinstance(request,dict) or set(request)!=fields or request['confirmed'] is not True
+            or any(not isinstance(request[k],str) or not HEX.fullmatch(request[k]) for k in ['id','snapshot_sha256','note_sha256'])
+            or type(request['owner_uid']) is not int or not 0<=request['owner_uid']<2**32-1 or not callable(before_io)):
+        raise PermissionError('exact inspected historical rejected-token Owner disposal required')
+    from .gateway_google_chat_identity import validate
+    identity=validate(identity)
+    def current():private();before_io()
+    current()
+    return await _dispose_identity(store,identity,request,current,http=http)
+
+
+async def _dispose_identity(store,identity,request,current,*,http=None):
     current();TokenVault(store);db=store.db
     row=db.execute('SELECT * FROM google_chat_oauth_quarantine WHERE id=?',(request['id'],)).fetchone()
     if row is None:raise PermissionError('known private rejected Google credential capsule required')
-    row,tokens,public=checked(row,account);snapshot=view(row,account)
+    row,tokens,public=checked_identity(row,identity);snapshot=view_identity(row,identity)
     db.execute('''CREATE TABLE IF NOT EXISTS google_chat_oauth_quarantine_decisions(
         id TEXT PRIMARY KEY,quarantine_id TEXT NOT NULL,owner_uid INTEGER NOT NULL,note_sha256 TEXT NOT NULL,
         snapshot_sha256 TEXT NOT NULL,state TEXT NOT NULL,receipt TEXT NOT NULL,created_at REAL NOT NULL)''')

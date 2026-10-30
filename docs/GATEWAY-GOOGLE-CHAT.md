@@ -587,3 +587,30 @@ identity recovery and the public management GUI/CLI remain in progress. These
 functions do not activate Google Chat publicly; the software count stays15/22.
 
 Exact-source checks: [historical Owner token status/withdrawal and regression](evidence/2026-10-30/google-chat-private-historical-tokens-validation.json).
+
+
+The historical worker also supports rejected-token inventory and explicit
+snapshot-bound disposal after active configuration and service-account keys are
+removed. Capsule scope/project, canonical payload checksum and nonactive state
+remain checked against the retained public app identity. Metadata works without
+optional SDK/Hermes runtime paths and captures private capsule tokens in bounded
+redaction. No verified-user or API-use authority follows from a rejected capsule.
+
+The actual Root handoff requires selected app/capsule snapshots, explicit
+confirmation and an audit note. FULL `revocation-pending` state plus the exact
+Owner decision `writing` intent precedes the one fixed revocation POST. Only a
+confirmed response and durable receipt compact the private capsule; uncertain,
+refused or rate-limited outcomes preserve its guarded payload. Repeating a
+completed decision reuses its original receipt without a second request. This
+does not claim erasure from WAL, other copies/backups or external account state
+beyond the checked revocation response.
+
+The historical process fixture now retains the wrong-user capsule until after
+connector/key/config removal. Its independent TLS server checks the committed
+pending/decision state before receiving the revocation. Root/private UID,
+metadata tamper, actual profile lock, parent lifetime and pending-publication
+gates still apply. The active Owner disposal path and full OAuth lifecycle also
+remain tested. Historical output association/purge, legacy missing-identity
+recovery and public GUI/CLI/daemon setup remain open; count stays15/22.
+
+Exact-source checks: [historical rejected credentials and regression](evidence/2026-10-30/google-chat-private-historical-quarantine-validation.json).

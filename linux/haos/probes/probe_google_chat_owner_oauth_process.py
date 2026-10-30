@@ -100,6 +100,10 @@ except PermissionError:print(json.dumps({'error':'root-backend-authority-refused
                     with sqlite3.connect(database) as db:
                         assert db.execute('SELECT status FROM google_chat_user_tokens').fetchone()[0]=='revoked-local'
                         assert db.execute("SELECT state FROM google_chat_oauth_revocations ORDER BY created_at DESC LIMIT 1").fetchone()[0]=='writing'
+                else:
+                    with sqlite3.connect(database) as db:
+                        assert db.execute('SELECT state FROM google_chat_oauth_quarantine').fetchone()[0]=='revocation-pending'
+                        assert db.execute("SELECT state FROM google_chat_oauth_quarantine_decisions ORDER BY created_at DESC LIMIT 1").fetchone()[0]=='writing'
                 requests.append('revoke');self.reply(200,{});return
             assert self.path=='/token' and values['grant_type']==['authorization_code']
             code=values['code'][0];entry=authorizations[code]
@@ -157,10 +161,13 @@ print('denied')
             else:
                 assert result['error']=='identity-refused'
                 items=call('inspect',{'kind':'quarantines'})['quarantines'];assert len(items)==1 and not items[0]['api_use_authorized']
-                disposed=call('dispose',{'row':items[0],'note':'explicit wrong-account cleanup','confirmed':True})
-                assert disposed['remote_revocation_verified'] and disposed['network_requested'] and not disposed['api_use_authorized']
-                assert not call('dispose',{'row':items[0],'note':'explicit wrong-account cleanup','confirmed':True})['network_requested']
-                cases.append('actual_Owner_worker_refuses_wrong_signed_Google_user_retains_private_nonactive_capsule_and_explicit_snapshot_disposal_revokes_once_before_compaction')
+                if os.environ.get('HAOS_GOOGLE_CHAT_RETIRED_OAUTH_PROCESS')=='1':
+                    cases.append('actual_Owner_worker_refuses_wrong_signed_Google_user_and_retains_nonactive_private_capsule_for_historical_cleanup_after_app_removal')
+                else:
+                    disposed=call('dispose',{'row':items[0],'note':'explicit wrong-account cleanup','confirmed':True})
+                    assert disposed['remote_revocation_verified'] and disposed['network_requested'] and not disposed['api_use_authorized']
+                    assert not call('dispose',{'row':items[0],'note':'explicit wrong-account cleanup','confirmed':True})['network_requested']
+                    cases.append('actual_Owner_worker_refuses_wrong_signed_Google_user_retains_private_nonactive_capsule_and_explicit_snapshot_disposal_revokes_once_before_compaction')
         sessions=call('inspect',{'kind':'sessions'})['sessions'];assert {row['status'] for row in sessions}=={'complete','refused'}
         policy['bindings']=[];publication.write_text(json.dumps(policy));publication.chmod(0o644)
         if os.environ.get('HAOS_GOOGLE_CHAT_RETIRED_OAUTH_PROCESS')=='1':
