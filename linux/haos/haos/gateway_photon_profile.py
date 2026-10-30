@@ -68,7 +68,18 @@ def build(value, *, parent, connector, policy, inbox):
                 raise PermissionError('native Photon identity or guarded transport changed')
             return selected
         adapter._haos_photon_check = check
-        originals = Originals(profile / 'originals.db', inbox.redactor, check); adapter._haos_photon_originals = originals
+        source_path = profile / 'originals.db'
+        try: source_path.lstat()
+        except FileNotFoundError:
+            from .gateway_photon_health import known_account
+            if known_account(inbox.db, scope(value)):
+                raise Conflict('known Photon original journal is missing; preserve and inspect retained state')
+            originals = Originals(source_path, inbox.redactor, check)
+        else:
+            from .gateway_photon_recovery import open_retained
+            originals = open_retained(profile, check)
+            originals.store.redactor = inbox.redactor
+        adapter._haos_photon_originals = originals
         adapter._haos_photon_cursor = Cursor(originals, value, authority)
         adapter._haos_photon_health = Ledger(inbox, connector, value, identity, authority, profile=originals)
         from .gateway_photon_codec import install

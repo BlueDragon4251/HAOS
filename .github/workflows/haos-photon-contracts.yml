@@ -63,7 +63,7 @@ jobs:
       - name: Actual native TLS HTTP protobuf gRPC and durable ingress under the private UID
         run: |
           set -euo pipefail
-          for fixture_case in normal dedicated health-withdraw health-store-refusal http401 http401-status-loss http403 http429 grpc401 grpc429 wrong-line refresh401 refresh429 reply-confirmed reply-restart reply-disconnect reply-reset reply-sql-refusal reply-withdraw media-image media-document media-voice-caf media-truncated media-withdraw media-unapproved media-storage-refusal; do
+          for fixture_case in normal dedicated health-withdraw health-store-refusal http401 http401-status-loss http403 http429 grpc401 grpc429 wrong-line refresh401 refresh429 reply-confirmed reply-restart reply-disconnect reply-reset reply-sql-refusal reply-withdraw media-image media-document media-voice-caf media-truncated media-withdraw media-unapproved media-storage-refusal original-journal-missing original-schema-missing; do
             docker run --rm --network none --pids-limit 192 --memory 2g \
               -v "$PWD:/repo:ro" -v "$RUNNER_TEMP/photon-installed-runtime/photon:/input/photon:ro" \
               -v "$RUNNER_TEMP/photon-installed-runtime/hermes:/input/hermes:ro" \
@@ -112,6 +112,24 @@ jobs:
             exit 1
           fi
           python -c 'import pathlib,sys; assert "failed status write retained closed-profile lease" in pathlib.Path(sys.argv[1]).read_text()' "$RUNNER_TEMP/photon-install/prior-failed-close.log"
+      - name: Prior initializer must fail the same actual missing-original custody test
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin cb6190a5da3c76487705614df71a933e2c2ed5b7
+          git show cb6190a5da3c76487705614df71a933e2c2ed5b7:linux/haos/haos/gateway_photon_profile.py > "$RUNNER_TEMP/photon-install/prior-original-profile.py"
+          if docker run --rm --network none --pids-limit 192 --memory 2g \
+              -v "$PWD:/repo:ro" -v "$RUNNER_TEMP/photon-installed-runtime/photon:/input/photon:ro" \
+              -v "$RUNNER_TEMP/photon-installed-runtime/hermes:/input/hermes:ro" \
+              -v "$PWD/upstream/hermes-agent/.venv/lib/python3.11/site-packages:/deps:ro" \
+              -v "$RUNNER_TEMP/photon-install/prior-original-profile.py:/baseline/profile.py:ro" \
+              -e HAOS_DISPOSABLE_PHOTON_PROFILE=1 \
+              python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+              python3 /repo/linux/haos/probes/probe_photon_profile.py --case original-journal-missing \
+              > "$RUNNER_TEMP/photon-install/prior-missing-original.log" 2>&1; then
+            echo 'Prior initializer unexpectedly refused lost original custody'
+            exit 1
+          fi
+          python -c 'import pathlib,sys; assert "known Photon original custody was recreated without owner decision" in pathlib.Path(sys.argv[1]).read_text()' "$RUNNER_TEMP/photon-install/prior-missing-original.log"
       - uses: actions/upload-artifact@v7
         if: always()
         with:

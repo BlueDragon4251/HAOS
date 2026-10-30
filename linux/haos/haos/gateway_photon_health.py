@@ -12,6 +12,14 @@ STATES = frozenset({'created', 'connecting', 'local-ready', 'upstream-observed',
 TERMINAL = frozenset({'authentication-refused', 'identity-refused', 'cursor-refused', 'revoked'})
 
 
+def known_account(db, account):
+    for table in ['photon_profile_status', 'photon_account_budget']:
+        if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)).fetchone() and db.execute(
+                'SELECT 1 FROM ' + table + ' WHERE account_scope=? LIMIT 1', (account,)).fetchone():
+            return True
+    return False
+
+
 class Ledger:
     def __init__(self, inbox, connector, value, publication, current, *, profile=None):
         if not callable(current): raise PermissionError('current independent Photon authority required')

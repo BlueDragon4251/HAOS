@@ -42,6 +42,18 @@ malformed history and missing/nonfinite account budgets require Owner inspection
 reopening or rotating the key cannot reset them into a fresh account. No upstream
 connection starts before that persistent provenance check succeeds.
 
+Recorded status now cross-checks those original-journal identities too, without
+acquiring the active profile lease. A lost status row is an inspection error even
+after key rotation. A known missing profile/original file, incomplete original
+schema, or missing central journal beside retained originals is not reported as
+a new unused account. Shared read-only snapshot checks preserve private file,
+WAL/SHM, inode and single-link custody without an initializer or permission repair.
+The native factory opens existing originals only after that schema preflight and
+refuses to create a replacement when the account has recorded status/budget
+history. Native loss fixtures retain the displaced original file or table and
+verify unchanged bytes, existing native/parent receipts, no new vendor request
+and release of the failed rebuild's actual kernel lease.
+
 Photon provides managed iMessage transport. It does not require the Owner to
 operate a Mac relay. Actual account entitlement, a provisioned project, assigned
 line and external delivery require a later account-specific acceptance. Shared

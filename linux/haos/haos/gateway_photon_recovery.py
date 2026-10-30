@@ -6,11 +6,8 @@ the mutation. No request here authorizes receipt, delivery or network access.
 import hashlib
 import json
 import math
-import os
 from pathlib import Path
 import re
-import sqlite3
-import stat
 import time
 
 from .gateway import Conflict, digest
@@ -33,29 +30,13 @@ def open_retained(profile, current):
     """Inspect the existing source schema before any initializer can repair it."""
     from .gateway_runtime import require_runtime_identity
     from .gateway_line_profile import _directory
+    from .gateway_photon_journal import readonly, ORIGINAL_COLUMNS
     from .gateway_photon_custody import Originals
     from .redaction import Redactor
     require_runtime_identity(); current(); profile = Path(profile); _directory(profile)
     path = profile / 'originals.db'
-    descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
-    try:
-        def private(item):
-            if (not stat.S_ISREG(item.st_mode) or item.st_uid != os.geteuid() or item.st_gid != os.getegid()
-                    or item.st_nlink != 1 or item.st_mode & 0o077): raise PermissionError('private retained Photon original journal required')
-        before = os.fstat(descriptor); private(before)
-        if path.resolve() != path: raise PermissionError('canonical retained Photon journal required')
-        for suffix in ['-wal', '-shm']:
-            try: private(path.with_name(path.name + suffix).lstat())
-            except FileNotFoundError: pass
-        db = sqlite3.connect(path.as_uri() + '?mode=ro', uri=True, timeout=2)
-        try:
-            after = path.lstat(); private(after)
-            if (before.st_dev, before.st_ino) != (after.st_dev, after.st_ino): raise PermissionError('retained Photon journal replaced while opening')
-            db.execute('PRAGMA query_only=ON')
-            db.execute('SELECT id,connector,account_scope,message_id,credential_scope,binding_id,binding_digest,semantic_sha256,'
-                'raw,raw_sha256,proof,normalized,normalized_sha256,parts,admitted_receipt,created_at FROM photon_originals LIMIT 0')
-        finally: db.close()
-    finally: os.close(descriptor)
+    with readonly(path) as db:
+        db.execute('SELECT ' + ','.join(ORIGINAL_COLUMNS) + ' FROM photon_originals LIMIT 0')
     current(); return Originals(path, Redactor([]), current)
 
 

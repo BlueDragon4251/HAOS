@@ -18,6 +18,7 @@ if len(sys.argv)>1:
  else:raise AssertionError('foreign identity entered Photon status reader')
  print(json.dumps({'denied_before_optional_SDK':True}));raise SystemExit(3)
 from haos.gateway_raw import NativeInbox
+from haos.gateway_photon_custody import Originals
 from haos.redaction import Redactor
 from haos.gateway_matrix_profile import acquire_lease
 cases=[];checks=[]
@@ -33,6 +34,9 @@ db.execute('INSERT INTO photon_profile_status VALUES(?,?,?,?,?,?)',('foreign-acc
 db.execute('INSERT INTO photon_profile_status VALUES(?,?,?,?,?,?)',('foreign-connector',params['account_scope'],'a'*64,'other','upstream-observed',100))
 db.execute('INSERT INTO photon_account_budget VALUES(?,?)',(params['account_scope'],180))
 db.execute('INSERT INTO photon_account_budget VALUES(?,?)',('photon:'+'c'*64,900))
+profiles=path.parent/'profiles';profiles.mkdir(mode=0o700)
+profile=profiles/('photon-'+'b'*64);profile.mkdir(mode=0o700)
+originals=Originals(profile/'originals.db',Redactor([]),lambda:None)
 before=[tuple(row) for row in db.execute('SELECT * FROM photon_profile_status')],[tuple(row) for row in db.execute('SELECT * FROM photon_account_budget')]
 value=read(path,params,lambda:None)
 assert value['status']=='authentication-refused' and value['updated_at']==10 and value['next_attempt']==180
@@ -42,7 +46,7 @@ cases.append('actual_WAL_snapshot_selects_exact_account_credential_connector_wit
 rotated=read(path,{**params,'credential_scope':'d'*64},lambda:None)
 assert rotated['status']=='not-started' and rotated['updated_at'] is None and rotated['next_attempt']==180
 cases.append('rotated_key_without_profile_cannot_hide_persisted_account_retry_budget')
-profile=path.parent/'profile';profile.mkdir(mode=0o700);lease=acquire_lease(profile)
+lease=acquire_lease(profile)
 try:assert read(path,params,lambda:None)==value
 finally:os.close(lease)
 cases.append('actual_kernel_profile_lease_does_not_block_readonly_status_or_require_service_stop')
@@ -80,11 +84,40 @@ except (PermissionError,OSError):pass
 else:raise AssertionError('symlink status accepted')
 assert link.is_symlink()
 cases.append('actual_hardlink_and_symlink_status_paths_refused_and_preserved')
+db.execute("UPDATE photon_profile_status SET id=? WHERE id='current'",('1'*64,))
+originals.db.execute('CREATE TABLE photon_health_profiles(id TEXT PRIMARY KEY,account_scope TEXT,credential_scope TEXT)')
+originals.db.execute('INSERT INTO photon_health_profiles VALUES(?,?,?)',('1'*64,params['account_scope'],params['credential_scope']))
+assert read(path,params,lambda:None)==value
+saved=db.execute('SELECT * FROM photon_profile_status WHERE id=?',('1'*64,)).fetchone()
+db.execute('DELETE FROM photon_profile_status WHERE id=?',('1'*64,));denied('lost known status became fresh account')
+try:read(path,{**params,'credential_scope':'d'*64},lambda:None)
+except ValueError:pass
+else:raise AssertionError('key rotation concealed lost status provenance')
+assert db.execute('SELECT 1 FROM photon_profile_status WHERE id=?',('1'*64,)).fetchone() is None
+db.execute('INSERT INTO photon_profile_status VALUES(?,?,?,?,?,?)',tuple(saved))
+cases.append('actual_cross_journal_provenance_exposes_lost_status_even_after_key_rotation_without_recreation')
+originals.close();source=profile/'originals.db';retained=profile/'originals.retained-fixture'
+source.rename(retained);denied('known missing original journal became not started')
+assert not source.exists() and retained.exists();retained.rename(source)
+originals=Originals(source,Redactor([]),lambda:None)
+cases.append('actual_missing_original_journal_is_reported_without_creating_a_replacement')
+inbox.close();retained_native=path.with_name('native.retained-fixture');path.rename(retained_native)
+denied('missing central native journal concealed retained original provenance')
+assert not path.exists() and retained_native.exists();retained_native.rename(path)
+inbox=NativeInbox(path,Redactor([]));db=inbox.db
+cases.append('actual_missing_central_status_journal_is_refused_beside_retained_originals_without_creation')
+originals.db.execute('ALTER TABLE photon_originals RENAME TO retained_original_schema')
+import sqlite3
+denied('missing original schema was hidden from recorded status',sqlite3.Error)
+assert not originals.db.execute("SELECT 1 FROM sqlite_master WHERE name='photon_originals'").fetchone()
+assert originals.db.execute("SELECT 1 FROM sqlite_master WHERE name='retained_original_schema'").fetchone()
+originals.db.execute('ALTER TABLE retained_original_schema RENAME TO photon_originals')
+cases.append('actual_incomplete_original_schema_is_refused_without_repair_by_readonly_status')
 def withdrawn():raise PermissionError('owner selection withdrawn')
 try:read(path,params,withdrawn)
 except PermissionError:pass
 else:raise AssertionError('withdrawn owner selection read status')
-inbox.close()
+inbox.close();originals.close()
 assert not any(name.startswith(('plugins.','httpx','aiohttp','google.')) for name in sys.modules)
 cases.append('withdrawn_authority_denied_and_optional_network_SDKs_never_imported')
 print(json.dumps({'passed':len(cases),'cases':cases,'actual_UID_SQLite_WAL_kernel_lease_and_filesystem':True,'optional_SDK_or_Hermes_imported':False,'network_requested':False}))

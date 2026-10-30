@@ -63,7 +63,7 @@ async def worker(directory):
     try:
         connected = await adapter.connect()
         scenario = config['scenario']
-        if scenario not in {'normal', 'dedicated', 'health-withdraw', 'health-store-refusal'} and not scenario.startswith(('reply-', 'media-')):
+        if scenario not in {'normal', 'dedicated', 'health-withdraw', 'health-store-refusal'} and not scenario.startswith(('reply-', 'media-', 'original-')):
             if connected: (root / 'emit').write_text('emit fixture native refusal')
             expected = 'identity-refused' if scenario == 'wrong-line' else 'rate-limited' if scenario.endswith('429') else 'authentication-refused'
             deadline = time.monotonic() + 10
@@ -189,6 +189,41 @@ async def worker(directory):
         assert originals.execute('SELECT COUNT(*) FROM photon_refusals').fetchone()[0] == 1
         assert len(originals.execute('SELECT admitted_receipt FROM photon_originals').fetchone()[0]) == 64
         assert adapter._haos_photon_cursor.resume() == '2'
+        if scenario.startswith('original-'):
+            from haos.gateway import Conflict
+            await adapter.close()
+            source_path = next(parent.iterdir()) / 'originals.db'
+            if scenario == 'original-journal-missing':
+                retained = source_path.with_name('originals.retained-fixture'); source_path.rename(retained)
+            else:
+                connection = sqlite3.connect(source_path)
+                connection.execute('ALTER TABLE photon_originals RENAME TO retained_original_schema'); connection.commit(); connection.close()
+                retained = source_path
+            previous = hashlib.sha256(retained.read_bytes()).hexdigest()
+            before = json.loads((root / 'counts.json').read_text())['http']
+            try: reopened = build(value, parent=parent, connector='phone', policy=current, inbox=inbox)
+            except (Conflict, sqlite3.Error): pass
+            else:
+                await reopened.close()
+                raise AssertionError('known Photon original custody was recreated without owner decision')
+            assert hashlib.sha256(retained.read_bytes()).hexdigest() == previous
+            if scenario == 'original-journal-missing': assert not source_path.exists()
+            else:
+                connection = sqlite3.connect(source_path.as_uri() + '?mode=ro', uri=True)
+                try:
+                    assert not connection.execute("SELECT 1 FROM sqlite_master WHERE name='photon_originals'").fetchone()
+                    assert connection.execute('SELECT COUNT(*) FROM retained_original_schema').fetchone()[0] == 1
+                finally: connection.close()
+            from haos.gateway_matrix_profile import acquire_lease
+            lease = acquire_lease(next(parent.iterdir())); os.close(lease)
+            assert inbox.db.execute('SELECT COUNT(*) FROM native_inbox').fetchone()[0] == 1
+            assert relay.db.execute('SELECT COUNT(*) FROM inbox').fetchone()[0] == 1
+            assert json.loads((root / 'counts.json').read_text())['http'] == before
+            return {'passed': 6, 'scenario': scenario, 'cases': ['actual_native_message_has_original_and_parent_custody_before_loss',
+                'known_missing_original_custody_is_not_recreated', 'retained_original_bytes_or_schema_are_unchanged',
+                'failed_rebuild_releases_actual_kernel_lease', 'existing_native_and_parent_receipts_are_preserved',
+                'no_new_vendor_HTTP_or_native_message_delivery'], 'counts': json.loads((root / 'counts.json').read_text()),
+                'live_Photon_verified': False, 'controller_IPC_verified': False, 'OS_release_artifact': False}
         if scenario == 'dedicated':
             counts = json.loads((root / 'counts.json').read_text())
             assert counts['grpc']['SubscribeMessageEvents'] == 1
@@ -333,7 +368,7 @@ def main():
         raise PermissionError('fresh disposable PID-1 network-disabled profile fixture required')
     scenario = sys.argv[2] if len(sys.argv) == 3 and sys.argv[1] == '--case' else 'normal'
     if scenario not in {'normal', 'dedicated', 'health-withdraw', 'health-store-refusal', 'http401', 'http401-status-loss', 'http403', 'http429', 'grpc401', 'grpc429', 'wrong-line', 'refresh401', 'refresh429',
-            'reply-confirmed', 'reply-restart', 'reply-disconnect', 'reply-reset', 'reply-sql-refusal', 'reply-withdraw'}:
+            'reply-confirmed', 'reply-restart', 'reply-disconnect', 'reply-reset', 'reply-sql-refusal', 'reply-withdraw', 'original-journal-missing', 'original-schema-missing'}:
         if scenario not in {'media-image', 'media-document', 'media-voice-caf', 'media-truncated', 'media-withdraw', 'media-unapproved', 'media-storage-refusal'}:
             raise ValueError('finite fixture case required')
     root = Path('/usr/lib/haos'); root.mkdir(mode=0o755)
@@ -418,7 +453,7 @@ def main():
         'ready': str(directory / 'ready.json'), 'scenario': 'http401' if scenario == 'http401-status-loss' else scenario,
         'reply_source': mid, 'reply_chat': 'any;-;+15550100001', 'reply_receipt': str(uuid.uuid4()), 'write_observed': str(directory / 'write-observed'),
         'media': media, 'download_observed': str(directory / 'download-observed'),
-        'frames': [message(1, '+15550100009', str(uuid.uuid4())), approved, approved] if scenario in {'normal', 'dedicated', 'health-withdraw'} or scenario.startswith(('reply-', 'media-')) else []}
+        'frames': [message(1, '+15550100009', str(uuid.uuid4())), approved, approved] if scenario in {'normal', 'dedicated', 'health-withdraw'} or scenario.startswith(('reply-', 'media-', 'original-')) else []}
     (directory / 'server.json').write_text(json.dumps(config))
     peer = subprocess.Popen([str(root / 'photon/node'), str(fixtures / 'protocol.mjs'), str(directory / 'server.json')],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE)

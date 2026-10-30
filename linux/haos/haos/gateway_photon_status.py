@@ -1,12 +1,10 @@
 """Read recorded Photon state without credentials, SDK, network or profile lease."""
 import math
-import os
 from pathlib import Path
 import re
-import sqlite3
-import stat
 
-from .gateway_photon_health import STATES
+from .gateway_photon_health import STATES, known_account
+from .gateway_photon_journal import readonly, ORIGINAL_COLUMNS
 
 
 def selector(value):
@@ -39,35 +37,53 @@ def checked(value, request=None):
     return dict(value)
 
 
+def _profile_status(db, parent, params):
+    from .gateway_line_profile import _directory
+    known = db is not None and known_account(db, params['account_scope'])
+    profiles = parent / 'profiles'; profile = profiles / ('photon-' + params['account_scope'].removeprefix('photon:'))
+    for directory in [profiles, profile]:
+        try: _directory(directory)
+        except FileNotFoundError:
+            if known: raise ValueError('known Photon original profile is missing; owner inspection required') from None
+            return
+    try:
+        with readonly(profile / 'originals.db') as original:
+            original.execute('SELECT ' + ','.join(ORIGINAL_COLUMNS) + ' FROM photon_originals LIMIT 0')
+            if db is None: raise ValueError('native status journal is missing beside retained Photon originals')
+            if not original.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='photon_health_profiles'").fetchone():
+                # Legacy profiles have no independent status provenance yet.
+                # Their existing journal must still remain intact, not repaired.
+                return
+            rows = original.execute('SELECT * FROM photon_health_profiles LIMIT 65537').fetchall()
+            if len(rows) > 65536: raise ValueError('bounded Photon status provenance required')
+            for row in rows:
+                if (row['account_scope'] != params['account_scope'] or any(not isinstance(row[key], str)
+                        or not re.fullmatch(r'[a-f0-9]{64}', row[key]) for key in ['id', 'credential_scope'])):
+                    raise ValueError('Photon retained status provenance is damaged')
+                found = db.execute('SELECT account_scope,credential_scope,status,updated_at FROM photon_profile_status WHERE id=?', (row['id'],)).fetchone()
+                if (found is None or found['account_scope'] != row['account_scope'] or found['credential_scope'] != row['credential_scope']
+                        or found['status'] not in STATES):
+                    raise ValueError('known Photon status row is missing or changed; owner inspection required')
+                _time(found['updated_at'])
+            if rows and not db.execute('SELECT 1 FROM photon_account_budget WHERE account_scope=?', (params['account_scope'],)).fetchone():
+                raise ValueError('known Photon account retry budget is missing')
+    except FileNotFoundError:
+        if known: raise ValueError('known Photon original journal is missing; owner inspection required') from None
+
+
 def read(path, params, current):
     from .gateway_runtime import require_runtime_identity
     from .gateway_line_profile import _directory
-    require_runtime_identity(); params = selector(params); current()
-    path = Path(path); _directory(path.parent)
+    require_runtime_identity(); params = selector(params); current(); path = Path(path); _directory(path.parent)
     result = {**params, 'status': 'not-started', 'updated_at': None, 'next_attempt': 0,
         'observed_only': True, 'live_transport_verified': False, 'network_requested': False, 'private_credentials_returned': False}
-    try: descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
-    except FileNotFoundError:
-        current(); return checked(result, params)
     try:
-        def private(item):
-            if (not stat.S_ISREG(item.st_mode) or item.st_uid != os.geteuid() or item.st_gid != os.getegid()
-                    or item.st_nlink != 1 or item.st_mode & 0o077):
-                raise PermissionError('private Photon status journal required')
-        before = os.fstat(descriptor); private(before)
-        if path.resolve() != path: raise PermissionError('canonical fixed Photon status journal required')
-        for suffix in ['-wal', '-shm']:
-            try: private(path.with_name(path.name + suffix).lstat())
-            except FileNotFoundError: pass
-        db = sqlite3.connect(path.as_uri() + '?mode=ro', uri=True, timeout=2, isolation_level=None)
-        try:
-            after = path.lstat(); private(after)
-            if (before.st_dev, before.st_ino) != (after.st_dev, after.st_ino):
-                raise PermissionError('Photon status journal replaced while opening')
-            db.execute('PRAGMA query_only=ON'); db.execute('BEGIN')
+        with readonly(path) as db:
             expected = {'photon_profile_status', 'photon_account_budget'}
             tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('photon_profile_status','photon_account_budget')")}
             if tables and tables != expected: raise ValueError('incomplete Photon status journal requires owner inspection')
+            if not tables and db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name IN ('photon_output_intents','photon_native_projection') LIMIT 1").fetchone():
+                raise ValueError('Photon status history is missing beside retained native records')
             if tables:
                 row = db.execute('SELECT status,updated_at FROM photon_profile_status WHERE connector=? AND credential_scope=? AND account_scope=? ORDER BY updated_at DESC LIMIT 1',
                     (params['connector'], params['credential_scope'], params['account_scope'])).fetchone()
@@ -75,7 +91,8 @@ def read(path, params, current):
                 budget = db.execute('SELECT next_attempt FROM photon_account_budget WHERE account_scope=?', (params['account_scope'],)).fetchone()
                 if budget is not None: result['next_attempt'] = _time(budget[0])
                 elif row is not None: raise ValueError('Photon account retry budget is missing; owner inspection required')
-            db.execute('COMMIT')
-        finally: db.close()
-    finally: os.close(descriptor)
+            _profile_status(db, path.parent, params)
+    except FileNotFoundError:
+        if path.exists() or path.is_symlink(): raise ValueError('retained Photon journal disappeared during status read') from None
+        _profile_status(None, path.parent, params)
     current(); return checked(result, params)
