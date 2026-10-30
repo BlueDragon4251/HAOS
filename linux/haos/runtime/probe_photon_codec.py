@@ -54,21 +54,23 @@ async def run(upstream, sidecar, output):
         stamp = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
         for index, kind in enumerate(['text', 'reply', 'image', 'mixed-image', 'group-thread', 'voice', 'document',
                 'audio-file', 'caf-alias', 'mixed-unicode', 'mixed-no-marker', 'mixed-adjacent-markers', 'multi-file',
-                'restart-text', 'parent-receipt-lost']):
-            chat = 'any;+;chatFixture' if kind == 'group-thread' else 'any;-;+15550100001'
+                'restart-text', 'parent-receipt-lost', 'virtual-message', 'virtual-attachment', 'dedicated-chat']):
+            chat = 'any;+;chatFixture' if kind == 'group-thread' else 'iMessage;-;+15550100001' if kind == 'dedicated-chat' else 'any;-;+15550100001'
             target = str(uuid.uuid4()) if kind in {'reply', 'group-thread'} else ''
             binding = {'id': 'binding-' + str(index), 'connector': 'phone', 'identity': 'owner', 'sender': '+15550100001',
                 'chat': chat, 'thread': target, 'scope': scope(account), 'capabilities': ['create', 'read'],
                 'generation': secrets.token_hex(32), 'since': int(time.time() * 1000) - 10000,
                 'allow_media': True, 'allow_voice': True, 'allow_video': True}
             attachments = []; frames = {}
-            text = 'fixture native text' if kind in {'text', 'reply', 'group-thread', 'restart-text', 'parent-receipt-lost'} else 'caption \ufffc suffix' if kind == 'mixed-image' else ''
+            text_cases = {'text', 'reply', 'group-thread', 'restart-text', 'parent-receipt-lost', 'virtual-message', 'dedicated-chat'}
+            text = 'fixture native text' if kind in text_cases else 'caption \ufffc suffix' if kind == 'mixed-image' else ''
             if kind == 'mixed-unicode': text = '\ufeff\u0085caption \ufffc suffix\u0085\ufeff'
             elif kind == 'mixed-no-marker': text = 'caption after attachment'
             elif kind == 'mixed-adjacent-markers': text = 'left\ufffc\ufffcright'
-            if kind not in {'text', 'reply', 'group-thread', 'restart-text', 'parent-receipt-lost'}:
+            if kind not in text_cases:
                 data = caf if kind == 'caf-alias' else wav if kind in {'voice', 'audio-file'} else b'fixture document bytes' if kind == 'document' else png
                 aid = str(uuid.uuid4()); mime = 'audio/wav' if kind in {'voice', 'audio-file'} else 'application/octet-stream' if kind in {'document', 'caf-alias'} else 'image/png'
+                if kind == 'virtual-attachment': aid = 'spc-' + aid
                 name = 'fixture.caf' if kind == 'caf-alias' else 'fixture.wav' if kind in {'voice', 'audio-file'} else 'fixture.bin' if kind == 'document' else 'fixture.png'
                 attachments = [{'guid': aid, 'fileName': name, 'mimeType': mime, 'totalBytes': len(data), 'uti': 'public.data'}]
                 frames[aid] = base64.b64encode(data).decode()
@@ -76,6 +78,7 @@ async def run(upstream, sidecar, output):
                     duplicate = str(uuid.uuid4()); attachments.append({**attachments[0], 'guid': duplicate}); frames[duplicate] = frames[aid]
             message = {'guid': str(uuid.uuid4()), 'isFromMe': False, 'dateCreated': stamp, 'chatGuids': [chat],
                 'sender': {'address': binding['sender'], 'service': 'iMessage'}, 'content': {'text': text, 'attachments': attachments}}
+            if kind == 'virtual-message': message['guid'] = 'spc-' + message['guid']
             if kind in {'voice', 'caf-alias'}: message['isAudioMessage'] = True
             if target: message.update(replyTargetGuid=target, threadOriginatorGuid=target)
             source = {'phone': 'shared', 'cursor': str(index + 1), 'event': {'type': 'message.received', 'sequence': index + 1,

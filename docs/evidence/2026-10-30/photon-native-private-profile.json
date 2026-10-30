@@ -1,0 +1,574 @@
+{
+  "recorded_UTC": "2026-10-30T19:46:14.592553+00:00",
+  "base_commit": "b86faab2af386a857d7bb0a3dab23ce0b5c3a614",
+  "accepted_gateway_count": 16,
+  "Photon_complete": false,
+  "source_files": [
+    {
+      "path": ".github/workflows/haos-photon-contracts.yml",
+      "sha256": "f6b81d03192a5cb25165777ebee38931d251f533eabfb732d1c4dc8954ac2f70"
+    },
+    {
+      "path": "docs/GATEWAY-PHOTON.md",
+      "sha256": "b81cd63d33f8ade29faf2f08ba42c9e0e661cbce4490b5ab3496526550502f68"
+    },
+    {
+      "path": "linux/haos/haos/gateway_photon.py",
+      "sha256": "ddaf8cface41dfb12ca9a808f8d70385631dd36ea9417e20fc6d88a849eb8b2d"
+    },
+    {
+      "path": "linux/haos/haos/gateway_photon_admission.py",
+      "sha256": "220712c628ee96c15178468aa72ee5e663c4bb4f15bd099a6812d10306833a3e"
+    },
+    {
+      "path": "linux/haos/haos/gateway_photon_control.py",
+      "sha256": "6fe7c36071e5f36cc2dc1396cd3374973fed21625701e57b54444b0478219e0a"
+    },
+    {
+      "path": "linux/haos/haos/gateway_photon_custody.py",
+      "sha256": "b23827e2ba98e457ccd10535315e7dc479d247cb0a4451c6b348a9fce3bdb21b"
+    },
+    {
+      "path": "linux/haos/haos/gateway_photon_health.py",
+      "sha256": "ba09e2ac7092adac24f17858dce4039c47e5a084973a1691cf9762d4622344b0"
+    },
+    {
+      "path": "linux/haos/haos/gateway_photon_process.py",
+      "sha256": "8b4b16b937120867dba2aceb277647aa5589684362e102547054c1dc424a8239"
+    },
+    {
+      "path": "linux/haos/haos/gateway_photon_profile.py",
+      "sha256": "4169e524492e724d6e1348736359d505d21b610ff38d214822d4d17e0ce73ff2"
+    },
+    {
+      "path": "linux/haos/probes/probe_photon_profile.py",
+      "sha256": "567ebe6d7ed36559bd1b227f6ef11fca41731616bc2b30311bbf1c8196fac27f"
+    },
+    {
+      "path": "linux/haos/runtime/photon_cloud.mjs",
+      "sha256": "dff7346d26e723495c417e5e7ba7f677c4d2d7988056d12e82617959bd2f2ad6"
+    },
+    {
+      "path": "linux/haos/runtime/photon_protocol_fixture.mjs",
+      "sha256": "b1c4d57c709693f434c79eac2e4345fca8184184672887770702bf5e3a320718"
+    },
+    {
+      "path": "linux/haos/runtime/photon_sidecar.mjs",
+      "sha256": "8fda1911d312c6860e833f8d104a13c8d278de56914858941804dd120a732be7"
+    },
+    {
+      "path": "linux/haos/runtime/probe_photon_cloud.mjs",
+      "sha256": "fe5782037c6418f963cbfd8b41bd55a59c82a453c40cfe830ea60d0405bf6dae"
+    },
+    {
+      "path": "linux/haos/runtime/probe_photon_codec.py",
+      "sha256": "fd02c11a004984d00f6c98033bc0ccd95edc57e46e3578096edfb66ceef08c7a"
+    },
+    {
+      "path": "linux/haos/runtime/probe_photon_sdk_codec.mjs",
+      "sha256": "2e7ff4a9b3208baad6d2bb71bdfd1fd074bc73ea274ef7c696bd8617e582a88b"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_photon_admission.py",
+      "sha256": "216aed12c930a0a6677d668ff44e698eeb5ad75d49b918ecc4c7a8ca882bd8ac"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_photon_control.py",
+      "sha256": "e88a6aa2cc58f33c3f77ce2367c24b0f8ed6480b16654b3fcab7c87fa316f3aa"
+    },
+    {
+      "path": "linux/haos/tests/test_gateway_photon_health.py",
+      "sha256": "2b3157aaa1ef80c4496c44b7d11f77692a104b808a8fe7567d987c7db65bec40"
+    }
+  ],
+  "actual_native_private_profile": {
+    "passed": 7,
+    "cases": [
+      "actual_private_UID_Node_TLS_HTTP_auth_and_protobuf_gRPC",
+      "unknown_sender_hash_only_refusal_before_native_mapping",
+      "approved_native_SDK_sidecar_Python_codec_durable_relay",
+      "duplicate_native_message_exactly_one_parent_row",
+      "original_and_native_custody_have_parent_receipt",
+      "actual_native_stream_advances_durable_cursor",
+      "owner_withdrawal_stops_actual_Node_and_Unix_control"
+    ],
+    "counts": {
+      "http": {
+        "GET /projects/fixture-project/": 1,
+        "POST /projects/fixture-project/imessage/tokens": 1,
+        "GET /projects/fixture-project/platforms/": 1
+      },
+      "grpc": {
+        "SubscribeMessageEvents": 1,
+        "CatchUpEvents": 1,
+        "SubscribePollEvents": 1
+      },
+      "refused_auth": 0,
+      "emitted": 3,
+      "cancelled": {},
+      "timer_ticks": 60
+    },
+    "live_Photon_verified": false,
+    "controller_IPC_verified": false,
+    "OS_release_artifact": false,
+    "substitution": "Root fixture-only SDK HTTP/gRPC endpoint literals and fresh trusted loopback TLS CA; actual SDK, native codec, private process and custody"
+  },
+  "actual_installed_process": {
+    "schema": 1,
+    "passed": 17,
+    "cases": [
+      "actual_private_UID_GID_accepts_only_verified_fixed_Node_command",
+      "actual_kernel_root_cannot_use_gateway_command",
+      "actual_kernel_agent_cannot_use_gateway_command",
+      "actual_kernel_supplementary-root_cannot_use_gateway_command",
+      "actual_kernel_saved-root-uid_cannot_use_gateway_command",
+      "actual_kernel_saved-root-gid_cannot_use_gateway_command",
+      "actual_installed_spectrum_version_drift_refused",
+      "actual_installed_hermes_commit_drift_refused",
+      "actual_installed_schema_drift_refused",
+      "actual_source_bytes_cannot_change_behind_trusted_metadata",
+      "actual_writable_program_refused",
+      "actual_hardlinked_program_refused",
+      "actual_foreign_owned_program_refused",
+      "actual_missing_NoNewPrivileges_refused_before_any_child_or_credentials_handoff",
+      "actual_production_Node_bootstrap_is_stopped_on_owner_withdrawal_before_SDK_init",
+      "actual_parent_hard_exit_kills_production_Node_bootstrap_before_SDK_init",
+      "actual_official_Node_private_UID_flags_and_readonly_SDK_resume_probe_pass"
+    ],
+    "actual_node": "24.19.0",
+    "scope": "actual verified installed programs, kernel identities, NoNewPrivileges, production bootstrap and Unix peer, early withdrawal and parent death",
+    "substitution": "initial resume RPC held before SDK/cloud initialization",
+    "live_Photon_verified": false,
+    "native_gRPC_verified": false,
+    "OS_release_artifact": false
+  },
+  "actual_image_component_install": {
+    "schema": 1,
+    "actual_installer": true,
+    "node": "24.19.0",
+    "spectrum": "12.7.0",
+    "hermes_commit": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+    "runtime_programs": 12,
+    "source_sha256": "ef0df91f985a649d44405d18fde401bd161d2e324a5eff27df73a8d849718814",
+    "dependency_lifecycle_scripts": false,
+    "network_scope": "public locked npm dependencies only; no messaging SDK connection",
+    "live_Photon_verified": false,
+    "private_UID_process_verified": false,
+    "OS_release_artifact": false
+  },
+  "native_codec": {
+    "schema": 1,
+    "passed": 18,
+    "cases": [
+      "text_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+      "reply_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+      "image_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+      "mixed-image_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+      "group-thread_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+      "voice_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+      "document_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+      "audio-file_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+      "caf-alias_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+      "mixed-unicode_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+      "mixed-no-marker_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+      "mixed-adjacent-markers_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+      "multi-file_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+      "restart-text_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+      "parent-receipt-lost_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+      "virtual-message_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+      "virtual-attachment_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay",
+      "dedicated-chat_actual_Spectrum_sidecar_Hermes_codec_and_retained_replay"
+    ],
+    "scope": "actual prepared Spectrum mapper, sidecar normalizeEvent/normalizeContent, PhotonAdapter native dispatch, independent policy, FULL original/native/media/RelayInbox custody and restart",
+    "substitutions": [
+      "SDK remote RPC frames",
+      "final handler invokes actual RelayInbox without a controller connection"
+    ],
+    "external_messages_sent": false,
+    "controller_inference_verified": false,
+    "local_STT_verified": false,
+    "kernel_UID_verified_by_this_probe": false
+  },
+  "cloud_boundary_component_only": {
+    "passed": 8,
+    "cases": [
+      "native_JSON_preserved_with_redirects_refused_and_abort_bound",
+      "unknown_host_project_query_method_body_and_missing_auth_refused_before_fetch",
+      "HTTP_401_and_403_finite_terminal_status_without_response_body",
+      "HTTP_429_persists_bounded_account_budget",
+      "advertised_and_actual_cloud_response_size_capped",
+      "current_authority_required_before_cloud_fetch",
+      "actual_native_typed_gRPC_codes_use_finite_auth_rate_transport_status",
+      "dedicated_token_catalogue_selects_only_one_exact_approved_line_and_safe_host_label"
+    ],
+    "scope": "embedding cloud boundary contract; fixture fetch responses",
+    "live_Photon_verified": false
+  },
+  "minimal_regression": "3182 passed, 2 skipped in 25.13s",
+  "full_frozen_regression": "3182 passed, 2 skipped in 25.26s",
+  "actual_kernel_regression": "174 passed in 16.48s",
+  "baseline_CI": [
+    {
+      "conclusion": "success",
+      "databaseId": 41115061864,
+      "headSha": "b86faab2af386a857d7bb0a3dab23ce0b5c3a614",
+      "jobs": [
+        {
+          "completedAt": "2026-10-30T19:25:47Z",
+          "conclusion": "success",
+          "databaseId": 124267002077,
+          "name": "installed-private-process",
+          "startedAt": "2026-10-30T19:24:59Z",
+          "status": "completed",
+          "steps": [
+            {
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Run actions/checkout@v7",
+              "number": 2,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Prepare actual pinned image-install inputs",
+              "number": 3,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Actual official Node and locked SDK installation with lifecycle scripts disabled",
+              "number": 4,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Actual private UID program checks and production Node lifetime without external network",
+              "number": 5,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Run actions/upload-artifact@v7",
+              "number": 6,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@v7",
+              "number": 12,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 13,
+              "status": "completed"
+            }
+          ],
+          "url": "https://github.com/BlueDragon4251/HAOS/actions/runs/41115061864/job/124267002077"
+        },
+        {
+          "completedAt": "2026-10-30T19:25:32Z",
+          "conclusion": "success",
+          "databaseId": 124267002567,
+          "name": "prepared-native-contracts",
+          "startedAt": "2026-10-30T19:24:59Z",
+          "status": "completed",
+          "steps": [
+            {
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Run actions/checkout@v7",
+              "number": 2,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Run actions/setup-python@v7",
+              "number": 3,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Run actions/setup-node@v7",
+              "number": 4,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Prepare exact pinned Hermes and immutable Photon dependency inputs",
+              "number": 5,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Independent grants and actual FULL SQLite custody without Hermes imports",
+              "number": 6,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Run actions/upload-artifact@v7",
+              "number": 7,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Post Run actions/setup-node@v7",
+              "number": 12,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Post Run actions/setup-python@v7",
+              "number": 13,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@v7",
+              "number": 14,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 15,
+              "status": "completed"
+            }
+          ],
+          "url": "https://github.com/BlueDragon4251/HAOS/actions/runs/41115061864/job/124267002567"
+        }
+      ]
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 41115040321,
+      "headSha": "b86faab2af386a857d7bb0a3dab23ce0b5c3a614",
+      "jobs": [
+        {
+          "completedAt": "2026-10-30T19:29:20Z",
+          "conclusion": "success",
+          "databaseId": 124266930026,
+          "name": "services",
+          "startedAt": "2026-10-30T19:24:50Z",
+          "status": "completed",
+          "steps": [
+            {
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Run actions/checkout@v7",
+              "number": 2,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Run actions/setup-python@v7",
+              "number": 3,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Run python -m pip install pytest==9.0.2 websockets==15.0.1 PyYAML==6.0.3 Pillow==12.3.0",
+              "number": 4,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Run HAOS_TEST_PYTHON=\"$(command -v python)\" bash scripts/test-haos.sh --ignore=linux/haos/tests/test_backup.py",
+              "number": 5,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Install sandbox dependency for real root authority fixtures",
+              "number": 6,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Root-authority backup and policy-access tests in disposable fixtures",
+              "number": 7,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "QEMU runtime selection and privileged guest fixture regression tests",
+              "number": 8,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Verify exact owner-approved application files and persistent revocation",
+              "number": 9,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Real private host application Wayland input and denied peers",
+              "number": 10,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Run actions/upload-artifact@v7",
+              "number": 11,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Real local socket and kernel filesystem probes",
+              "number": 12,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Delegate and revoke real ACLs on isolated ext4 xfs btrfs disks",
+              "number": 13,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Launch the isolated filesystem view under actual production systemd hardening",
+              "number": 14,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Record actual diskless QEMU acceleration",
+              "number": 15,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Real bounded systemd application units and escaped-child cleanup",
+              "number": 16,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Run actions/upload-artifact@v7",
+              "number": 17,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Real persistent GUI queue and independently authorized application pipeline",
+              "number": 18,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Run actions/upload-artifact@v7",
+              "number": 19,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Actual production root application hardening and independent broker loss",
+              "number": 20,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Run actions/upload-artifact@v7",
+              "number": 21,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Separate hardened TLS viewer, kernel identities and real application frame delivery",
+              "number": 22,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Run actions/upload-artifact@v7",
+              "number": 23,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Actual encrypted retention, corrupt-data denial and damaged fixture restore",
+              "number": 24,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Deny inherited observer administrator rights on a disposable account",
+              "number": 25,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Validate service unit syntax",
+              "number": 26,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Enforce the actual agent socket UID boundary with nftables",
+              "number": 27,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Verify real owner password authentication and fixed CLI authority",
+              "number": 28,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Post Run actions/setup-python@v7",
+              "number": 55,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@v7",
+              "number": 56,
+              "status": "completed"
+            },
+            {
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 57,
+              "status": "completed"
+            }
+          ],
+          "url": "https://github.com/BlueDragon4251/HAOS/actions/runs/41115040321/job/124266930026"
+        }
+      ]
+    }
+  ],
+  "corrections": [
+    "Fixture test CA installed through update-ca-certificates; TLS verification retained",
+    "Fixture proto-loader PascalCase service names mapped to actual handlers",
+    "Production Node private umask set before listen, resolving actual supervisor socket mode race",
+    "Complete native Spectrum wrapper uses exact imessage platform; component fixture corrected and verifier requires it; iMessage fallback now negative",
+    "Native protobuf spc-* IDs and exact service-specific chat GUIDs accepted without aliasing"
+  ],
+  "claims": {
+    "external_messages_sent": false,
+    "live_Photon_connection": false,
+    "controller_IPC_verified": false,
+    "full_GUI_service_acceptance": false,
+    "OS_ISO_APK_release_acceptance": false
+  },
+  "next": "Wire bounded cloud and exact approved line selection into the actual SDK; exercise native HTTP/gRPC failures and refresh. Implement guarded output, controller and media/STT, secure Owner account GUI/CLI and inspected recovery before17. Continue remaining five gateways without changing roadmap."
+}

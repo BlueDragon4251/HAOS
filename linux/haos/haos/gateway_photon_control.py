@@ -22,7 +22,7 @@ from .gateway_photon_custody import MAX_NORMALIZED, re_full_hash
 
 
 class PolicyServer:
-    def __init__(self, path, token, *, child_pid, connector, value, policy, originals, current, cursor=None):
+    def __init__(self, path, token, *, child_pid, connector, value, policy, originals, current, cursor=None, health=None):
         self.path = Path(path)
         parent = self.path.parent.lstat()
         if (not self.path.is_absolute() or str(self.path.parent.resolve()) != str(self.path.parent)
@@ -34,6 +34,7 @@ class PolicyServer:
         self.token = token; self.child_pid = child_pid; self.connector = connector
         self.value = value; self.policy = policy; self.originals = originals; self.current = current
         self.cursor = cursor
+        self.health = health
         self.server = None; self.identity = None; self.connections = set(); self.lock = asyncio.Lock()
         self.originals.db.execute('''CREATE TABLE IF NOT EXISTS photon_refusals(
             id TEXT PRIMARY KEY,connector TEXT NOT NULL,reason TEXT NOT NULL,raw_sha256 TEXT NOT NULL)''')
@@ -90,7 +91,7 @@ class PolicyServer:
                 pieces = lines[0].split(' ')
                 if len(pieces) != 3 or pieces[0] != 'POST' or pieces[2] != 'HTTP/1.1': raise ValueError('fixed Photon control method required')
                 route = pieces[1]
-                if route not in {'/admit', '/current', '/custody', '/lease', '/resume', '/cursor', '/gap'}: raise PermissionError('unknown Photon control operation')
+                if route not in {'/admit', '/current', '/custody', '/lease', '/resume', '/cursor', '/gap', '/native-status'}: raise PermissionError('unknown Photon control operation')
                 headers = {}
                 for line in lines[1:]:
                     name, sep, content = line.partition(':')
@@ -144,6 +145,13 @@ class PolicyServer:
 
     def dispatch(self, route, raw):
         self.current(); policy = self.policy()
+        if route == '/native-status':
+            data = parse(raw)
+            if (self.health is None or set(data) != {'state', 'retry_after'} or not isinstance(data['state'], str)
+                    or data['state'] not in {'authentication-refused', 'identity-refused', 'rate-limited', 'transport-unavailable', 'upstream-observed'}
+                    or type(data['retry_after']) is not int or not 0 <= data['retry_after'] <= 86400):
+                raise ValueError('finite native Photon transport status required')
+            self.health.update(data['state'], data['retry_after']); return {'approved': True}
         if route in {'/resume', '/cursor', '/gap'}:
             if self.cursor is None: raise PermissionError('durable Photon resume state is unavailable')
             data = parse(raw)
@@ -152,7 +160,9 @@ class PolicyServer:
                 return {'approved': True, 'cursor': self.cursor.resume()}
             if set(data) != {'cursor'}: raise ValueError('exact native Photon cursor required')
             if route == '/gap':
-                self.cursor.gap(data['cursor']); return {'approved': True}
+                self.cursor.gap(data['cursor'])
+                if self.health is not None: self.health.update('cursor-refused')
+                return {'approved': True}
             return {'approved': True, 'cursor': self.cursor.advance(data['cursor'])}
         if self.cursor is not None: self.cursor.check()
         if route == '/admit':
@@ -163,7 +173,7 @@ class PolicyServer:
             return {'approved': True, 'source': key}
         if route == '/lease':
             if parse(raw) != {}: raise ValueError('empty Photon lease request required')
-            self.current(); return {'approved': True}
+            self.current(); return {'approved': self.health.permitted() if self.health is not None else True}
         data = json.loads(raw.decode('utf-8'), object_pairs_hook=_object, parse_constant=finite)
         if (not isinstance(data, dict) or set(data) != ({'source', 'event'} if route == '/custody' else {'source'})
                 or not isinstance(data.get('source'), str) or not re_full_hash(data['source'])):

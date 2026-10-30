@@ -56,7 +56,8 @@ def approve(policy, connector, value, raw):
         chat_id = chat(guids[0])
         if event.get('chatGuid', chat_id) != chat_id:
             raise Refused('ambiguous-chat')
-        if chat_id.startswith('any;-;') and chat_id[6:] != sender_id:
+        chat_parts = chat_id.split(';', 2)
+        if chat_parts[1] == '-' and chat_parts[2] != sender_id:
             raise Refused('ambiguous-sender')
         mid = message_id(msg.get('guid'))
         origin = msg.get('threadOriginatorGuid'); target = msg.get('replyTargetGuid')

@@ -14,7 +14,7 @@ concurrency:
 jobs:
   installed-private-process:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       - name: Prepare actual pinned image-install inputs
@@ -46,6 +46,26 @@ jobs:
             -e HAOS_DISPOSABLE_PHOTON_PROCESS=1 \
             python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
             python3 /repo/linux/haos/probes/probe_photon_process.py > "$RUNNER_TEMP/photon-install/private-process.json" 2> "$RUNNER_TEMP/photon-install/private-process.err"
+      - uses: actions/setup-python@v7
+        with: {python-version: '3.11'}
+      - name: Prepare exact frozen Python runtime for the actual private Photon profile
+        run: |
+          set -euo pipefail
+          python -m pip install uv
+          python linux/haos/runtime/prepare.py upstream/hermes-agent linux/haos/runtime
+          uv sync --project upstream/hermes-agent --frozen --python 3.11 --no-dev --extra web --extra messaging --extra anthropic --extra bedrock --extra vertex --extra azure-identity --extra matrix --extra voice --extra feishu --extra dingtalk --extra google-chat
+          uv pip install --python upstream/hermes-agent/.venv/bin/python --require-hashes --no-deps -r linux/haos/runtime/requirements.txt
+          uv pip check --python upstream/hermes-agent/.venv/bin/python
+      - name: Actual native TLS HTTP protobuf gRPC and durable ingress under the private UID
+        run: |
+          set -euo pipefail
+          docker run --rm --network none --pids-limit 192 --memory 2g \
+            -v "$PWD:/repo:ro" -v "$RUNNER_TEMP/photon-installed-runtime/photon:/input/photon:ro" \
+            -v "$RUNNER_TEMP/photon-installed-runtime/hermes:/input/hermes:ro" \
+            -v "$PWD/upstream/hermes-agent/.venv/lib/python3.11/site-packages:/deps:ro" \
+            -e HAOS_DISPOSABLE_PHOTON_PROFILE=1 \
+            python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+            python3 /repo/linux/haos/probes/probe_photon_profile.py > "$RUNNER_TEMP/photon-install/private-native-profile.json" 2> "$RUNNER_TEMP/photon-install/private-native-profile.err"
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -78,12 +98,13 @@ jobs:
           node --check "$SIDECAR/index.mjs"
           node linux/haos/runtime/probe_photon_transport.mjs "$SIDECAR" "$RUNNER_TEMP/photon-contracts/native-transport.json"
           node linux/haos/runtime/probe_photon_resume.mjs "$SIDECAR" "$RUNNER_TEMP/photon-contracts/native-resume.json"
+          node linux/haos/runtime/probe_photon_cloud.mjs "$RUNNER_TEMP/photon-contracts/cloud-boundary.json"
           upstream/hermes-agent/.venv/bin/python linux/haos/runtime/probe_photon_codec.py upstream/hermes-agent "$SIDECAR" "$RUNNER_TEMP/photon-contracts/native-codec.json"
       - name: Independent grants and actual FULL SQLite custody without Hermes imports
         run: |
           set -euo pipefail
           python -m pip install pytest
-          PYTHONPATH=linux/haos python -m pytest -q linux/haos/tests/test_gateway_photon_admission.py linux/haos/tests/test_gateway_photon_control.py linux/haos/tests/test_gateway_photon_cursor.py --junitxml="$RUNNER_TEMP/photon-contracts/authority.xml"
+          PYTHONPATH=linux/haos python -m pytest -q linux/haos/tests/test_gateway_photon_admission.py linux/haos/tests/test_gateway_photon_control.py linux/haos/tests/test_gateway_photon_cursor.py linux/haos/tests/test_gateway_photon_health.py --junitxml="$RUNNER_TEMP/photon-contracts/authority.xml"
       - uses: actions/upload-artifact@v7
         if: always()
         with:

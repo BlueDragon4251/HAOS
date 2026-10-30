@@ -111,14 +111,14 @@ class Child:
         except BaseException:
             await self.stop(); raise
 
-    async def stop(self):
+    async def stop(self, *, immediate=False):
         process = self.process
         if process is not None:
             # The main Node process can exit while one of its descendants is
             # still alive. Its private POSIX session remains ours to terminate.
-            try: os.killpg(process.pid, signal.SIGTERM)
+            try: os.killpg(process.pid, signal.SIGKILL if immediate else signal.SIGTERM)
             except ProcessLookupError: pass
-            if process.returncode is None:
+            if process.returncode is None and not immediate:
                 try:
                     async with asyncio.timeout(2): await process.wait()
                 except TimeoutError:

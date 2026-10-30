@@ -52,7 +52,7 @@ def normalized(raw, original, proof, value):
         data = json.loads(raw.decode('utf-8'), object_pairs_hook=_object, parse_constant=finite)
         message = original['event']['message']; envelope = proof['envelope']
         if (not isinstance(data, dict) or set(data) != {'messageId', 'platform', 'space', 'sender', 'content', 'timestamp'}
-                or data['messageId'] != envelope['message_id'] or data['platform'] != 'iMessage'
+                or data['messageId'] != envelope['message_id'] or data['platform'] != 'imessage'
                 or data['sender'] != {'id': envelope['sender']} or not isinstance(data['space'], dict)
                 or data['space'] != {'id': envelope['chat'], 'type': 'group' if ';+;' in envelope['chat'] else 'dm', 'phone': value['phone']}
                 or timestamp(data['timestamp']) != timestamp(original['event']['occurredAt'])):

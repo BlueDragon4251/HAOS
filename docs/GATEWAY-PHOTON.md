@@ -71,7 +71,7 @@ the normalized source is durable, a separate native inbox and the actual HAOS
 RelayInbox take responsibility for controller delivery. Restart recovers these
 decoded sources without requiring another SDK event. A lost parent receipt
 after a real relay commit retries the same durable identity, preserving one
-relay row. The codec/ingress probe now covers 15 cases, including database reopen
+relay row. The codec/ingress probe now covers 18 cases, including database reopen
 and that ambiguous receipt.
 
 The prepared actual Spectrum resumable stream accepts a durable initial cursor
@@ -83,11 +83,11 @@ Owner recovery. Ordinary nonembedded SDK behavior remains available unchanged.
 The HAOS embedding also disables automatic SDK RPC retries; actual write/RPC
 failure behavior still requires the forthcoming native transport fixture.
 
-The fixed Node embedding source is present and disables inherited telemetry,
+The fixed Node embedding disables inherited telemetry,
 automatic read receipts, contact sharing, implicit URL fetches, typing/reactions
-and unapproved writes. Its production process installation, full live transport
-and supervision still need to be connected and verified; source presence and
-syntax checks are not an installed-service acceptance.
+and unapproved writes. The prepared private profile connects that embedding to
+the actual SDK, Unix receive stream and durable inbox. It remains outside the
+public registry until outgoing replies and Owner management are complete.
 
 The image build now installs the exact official Node 24.19.0 archive and the
 committed Spectrum lockfile with dependency lifecycle scripts disabled. It
@@ -103,8 +103,35 @@ writable/hardlinked/foreign-owned program rejection, required NoNewPrivileges,
 withdrawal during startup and hard parent loss. The actual production bootstrap
 is used, with its first private resume RPC held before SDK initialization. The
 actual SDK resume probe also passes under the private UID using immutable
-installed modules. This does not establish a live or fixture gRPC connection,
-the complete service lifecycle, a booted OS or an installed GUI acceptance.
+installed modules. A second fixture now exercises the actual native connection:
+seven checks cover verified TLS/HTTP project authentication, the actual protobuf
+gRPC services, unknown-sender refusal, approved message admission through the
+native SDK/sidecar/Python codec, duplicate suppression, parent receipt and cursor
+persistence, and immediate Owner withdrawal of the running Node process.
+
+That fixture runs under the actual private UID in a network-disabled disposable
+container. Only SDK endpoint literals are changed to local peers, and a fresh
+test CA is installed using the regular system trust mechanism. No TLS verification
+is disabled. Two fixture assumptions were corrected: protobuf-loader service
+names are PascalCase, and the fully wrapped SDK supplies the exact provider name
+`imessage`. The independent projection checker now requires that actual name;
+the invented `iMessage` component fallback is explicitly refused. Native proxy
+`spc-*` message IDs and exact `any`/`iMessage`/`SMS`/`RCS` chat GUIDs follow the
+pinned protocol without aliasing different identities.
+
+The complete connection also exposed a socket creation race. The fixed Node
+bootstrap now sets a private umask before listening, so the supervisor cannot
+observe a transient nonprivate mode before the listen callback changes it.
+Current-authority checks remain required. Recorded finite status and stable
+account retry budgets are persisted atomically; later network errors cannot
+replace an earlier terminal authentication/revocation reason. This is recorded
+local state, never proof of live account entitlement or recipient receipt.
+
+The cloud-boundary helper has eight independent contract checks for fixed
+routes, response limits, redirects, authority, typed errors and dedicated line
+selection. It is not wired into the prepared SDK yet; its component tests do
+not establish native HTTP failure handling. The next integration step must
+exercise those actual SDK failures and token refresh paths.
 
 ## Evidence limits and work remaining
 
@@ -115,9 +142,9 @@ The Photon CI workflow runs these contracts without external messages. These
 checks do not establish a live Spectrum connection, receipt by another person,
 HAOS controller inference, installed service/GUI behavior or hardware acceptance.
 
-Still required before counting Photon: full native HTTP/gRPC profile and status,
-full durable receive/replay/controller path, actual native guarded replies and
-outbox, reconnect/rate/auth status, immediate process revocation, supported media
+Still required before counting Photon: full durable receive/replay/controller
+path, actual native guarded replies and outbox, SDK reconnect/rate/auth and
+refresh handling, supported media
 and voice conversion, inspected source/output/account recovery, real Owner GUI
 and CLI onboarding/device authentication, build installation/provenance and
 end-to-end native/private-UID fixtures. Continue this gateway before Raft,

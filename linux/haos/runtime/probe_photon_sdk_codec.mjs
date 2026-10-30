@@ -27,11 +27,11 @@ const native = new Function("hermesTransport", "MAX_INLINE_ATTACHMENT_BYTES", "B
 const fixtureModule = path.join(path.dirname(filename), `haos-fixture-${crypto.randomUUID()}.mjs`);
 const hooks = Symbol.for("hermes.photon.sdk.transport");
 try {
-  await fs.writeFile(fixtureModule, sdk + "\nexport {toMessageItem};\n", { flag: "wx" });
-  const { toMessageItem } = await import(pathToFileURL(fixtureModule));
+  await fs.writeFile(fixtureModule, sdk + "\nexport {toMessageItem,IMESSAGE_PLATFORM};\n", { flag: "wx" });
+  const { toMessageItem, IMESSAGE_PLATFORM } = await import(pathToFileURL(fixtureModule));
   globalThis[hooks] = { admitEvent: async () => true, disableAutomaticContactSharing: true, avoidReplyHydration: true };
   const fixtures = JSON.parse(await fs.readFile(input, "utf8"));
-  if (!Array.isArray(fixtures) || fixtures.length > 16) throw new Error("bounded explicit codec fixtures required");
+  if (!Array.isArray(fixtures) || fixtures.length > 24) throw new Error("bounded explicit codec fixtures required");
   const results = [];
   for (const fixture of fixtures) {
     const event = fixture.source.event;
@@ -51,7 +51,7 @@ try {
     const result = await toMessageItem(client, event, fixture.source.phone, fixture.source.cursor);
     if (result.values.length !== 1) throw new Error("one native source required");
     const message = result.values[0];
-    const projected = await native.normalizeEvent({ ...message.space, __platform: "iMessage" }, message);
+    const projected = await native.normalizeEvent({ ...message.space, __platform: IMESSAGE_PLATFORM }, message);
     if (!projected) throw new Error("native sidecar returned no source");
     results.push({ event: projected, closed_native_streams: closed });
   }

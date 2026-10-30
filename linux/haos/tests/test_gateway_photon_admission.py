@@ -43,6 +43,28 @@ def test_exact_project_sender_chat_timed_source(source):
     assert result['attachment_bytes'] == 0
 
 
+@pytest.mark.parametrize('prefix', ['any', 'iMessage', 'SMS', 'RCS'])
+def test_exact_native_chat_prefix_is_preserved_without_aliasing(source, prefix):
+    chat = prefix + ';-;+15550100001'
+    source[1]['bindings'][0]['chat'] = chat
+    source[2]['event']['chatGuid'] = chat; source[2]['event']['message']['chatGuids'] = [chat]
+    assert admit(source)['envelope']['chat'] == chat
+    source[2]['event']['message']['sender']['address'] = '+15550100002'
+    with pytest.raises(Refused): admit(source)
+
+
+def test_native_proxy_virtual_guid_is_exact_and_does_not_alias_a_uuid(source):
+    value = 'spc-' + str(uuid.uuid4())
+    source[2]['event']['message']['guid'] = value
+    assert admit(source)['envelope']['message_id'] == value
+
+
+@pytest.mark.parametrize('value', ['spc-', 'spc-../foreign', 'spc-space id', 'spc-\n', 'spc-' + 'x' * 125, 'SPC-other'])
+def test_unbounded_ambiguous_or_noncanonical_proxy_ids_refused(source, value):
+    source[2]['event']['message']['guid'] = value
+    with pytest.raises(Refused): admit(source)
+
+
 @pytest.mark.parametrize('change', ['sender', 'missing-sender', 'chat', 'ambiguous-chat', 'outer-chat', 'phone', 'service',
     'self', 'automatic', 'system', 'event', 'cursor', 'bool-sequence', 'missing-time', 'before-grant', 'future', 'thread',
     'unknown-reply', 'display-alias'])
@@ -163,7 +185,7 @@ def custody(source, tmp_path):
 
 def decoded(source):
     data = source[2]; binding = source[1]['bindings'][0]
-    return {'messageId': data['event']['message']['guid'], 'platform': 'iMessage',
+    return {'messageId': data['event']['message']['guid'], 'platform': 'imessage',
         'space': {'id': binding['chat'], 'type': 'dm', 'phone': source[0]['phone']},
         'sender': {'id': binding['sender']}, 'content': {'type': 'text', 'text': 'fixture command'},
         'timestamp': data['event']['occurredAt']}
@@ -193,7 +215,7 @@ def test_actual_full_sqlite_two_stage_custody_and_single_parent_receipt(source, 
     assert retain(source, custody) == key
 
 
-@pytest.mark.parametrize('change', ['sender', 'space', 'mode', 'time', 'id', 'platform', 'text', 'marker', 'extra', 'missing', 'unrequested-file'])
+@pytest.mark.parametrize('change', ['sender', 'space', 'mode', 'time', 'id', 'platform', 'unwrapped-platform-fallback', 'text', 'marker', 'extra', 'missing', 'unrequested-file'])
 def test_changed_native_projection_has_no_decoded_receipt(source, custody, change):
     from haos.gateway import Conflict
     store, policy, _ = custody; key = retain(source, custody); data = decoded(source)
@@ -203,6 +225,7 @@ def test_changed_native_projection_has_no_decoded_receipt(source, custody, chang
     elif change == 'time': data['timestamp'] = '2020-01-01T00:00:00Z'
     elif change == 'id': data['messageId'] = str(uuid.uuid4())
     elif change == 'platform': data['platform'] = 'another-plugin'
+    elif change == 'unwrapped-platform-fallback': data['platform'] = 'iMessage'
     elif change == 'text': data['content']['text'] = 'substituted command'
     elif change == 'marker': data['content'] = {'type': 'unknown'}
     elif change == 'extra': data['credential'] = 'unexpected field'

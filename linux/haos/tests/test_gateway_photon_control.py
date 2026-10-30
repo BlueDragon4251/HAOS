@@ -203,3 +203,29 @@ def test_missing_resume_store_is_not_reported_as_live_only_success(source, custo
     async def run(server, allowed, token):
         assert await request(server, allowed, frame(token, '/resume', {})) == (403, {'approved': False})
     asyncio.run(fixture(source, custody, run))
+
+
+def test_actual_child_finite_status_persists_and_stops_lease(source, custody):
+    from haos.gateway_photon_health import Ledger
+    async def run(server, allowed, token):
+        server.health = Ledger(custody[0].store, 'phone', source[0], 'fixture', custody[2])
+        assert await request(server, allowed, frame(token, '/native-status',
+            {'state': 'authentication-refused', 'retry_after': 0})) == (200, {'approved': True})
+        assert server.health.recorded()['status'] == 'authentication-refused'
+        assert await request(server, allowed, frame(token, '/lease', {})) == (200, {'approved': False})
+        assert await request(server, allowed, frame(token, '/native-status',
+            {'state': 'transport-unavailable', 'retry_after': 2})) == (200, {'approved': True})
+        assert server.health.recorded()['status'] == 'authentication-refused'
+    asyncio.run(fixture(source, custody, run))
+
+
+@pytest.mark.parametrize('body', [{'state': 'arbitrary', 'retry_after': 0},
+    {'state': 'rate-limited', 'retry_after': True}, {'state': 'rate-limited', 'retry_after': 86401},
+    {'state': 'rate-limited', 'retry_after': 0, 'token': 'untrusted'}])
+def test_actual_child_rejects_unbounded_native_status(source, custody, body):
+    from haos.gateway_photon_health import Ledger
+    async def run(server, allowed, token):
+        server.health = Ledger(custody[0].store, 'phone', source[0], 'fixture', custody[2])
+        assert await request(server, allowed, frame(token, '/native-status', body)) == (403, {'approved': False})
+        assert server.health.recorded()['status'] == 'created'
+    asyncio.run(fixture(source, custody, run))

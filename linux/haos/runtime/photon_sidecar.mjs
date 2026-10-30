@@ -20,6 +20,10 @@ if (!account || uid === 0 || uid !== Number(account[2]) || gid !== Number(accoun
     process.getgroups().some((group) => group !== gid) || !/^NoNewPrivs:\s+1$/m.test(status)) {
   throw new Error("unprivileged hardened HAOS gateway identity required");
 }
+// The Unix socket exists before the listen callback executes. Create it with
+// private permissions immediately so the supervisor never observes a public
+// transient mode and correctly refuses startup.
+process.umask(0o077);
 const control = process.env.HAOS_PHOTON_CONTROL_SOCKET;
 const policy = process.env.HAOS_PHOTON_POLICY_SOCKET;
 const token = process.env.PHOTON_SIDECAR_TOKEN;

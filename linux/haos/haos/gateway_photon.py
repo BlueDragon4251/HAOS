@@ -20,15 +20,18 @@ def peer(value):
 def chat(value):
     if not isinstance(value, str) or len(value) > 256:
         raise ValueError('exact native Photon chat GUID required')
-    if value.startswith('any;-;'):
-        peer(value[6:])
-    elif not re.fullmatch(r'(?:any|iMessage);\+;[A-Za-z0-9_-]{1,128}', value):
+    parts = value.split(';', 2)
+    if len(parts) == 3 and parts[0] in {'any', 'iMessage', 'SMS', 'RCS'} and parts[1] == '-':
+        peer(parts[2])
+    elif not re.fullmatch(r'(?:any|iMessage|SMS|RCS);\+;[A-Za-z0-9_-]{1,128}', value):
         raise ValueError('exact native Photon DM or group GUID required')
     return value
 
 
 def message_id(value):
-    if not isinstance(value, str) or not GUID.fullmatch(value):
+    # The pinned Photon protobuf contract also specifies path-safe proxy
+    # message GUIDs (spc-*). Preserve them exactly; never alias them to UUIDs.
+    if not isinstance(value, str) or not (GUID.fullmatch(value) or re.fullmatch(r'spc-[A-Za-z0-9_-]{1,124}', value)):
         raise ValueError('exact native Photon message GUID required')
     return value
 
