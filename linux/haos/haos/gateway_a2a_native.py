@@ -36,6 +36,8 @@ def build(value,peer,home,current,policy,tasks,receive):
     adapter.tasks=tasks;adapter._loop=asyncio.get_running_loop()
     from .gateway_a2a_inputs import Inputs
     inputs=Inputs(tasks)
+    from .gateway_a2a_artifacts import Artifacts
+    adapter._haos_a2a_artifacts=Artifacts(tasks)
     adapter._haos_a2a_home=home;adapter._haos_a2a_environment=environment
     adapter._security_context=security_context({**value,'peer_tokens':{peer:value['peer_tokens'][peer]}})
     native_prepare=adapter._prepare_task.__func__;native_handle=adapter.handle_message.__func__
@@ -228,6 +230,12 @@ def build(value,peer,home,current,policy,tasks,receive):
             check();record=tasks.get(task_id)
             if record is None or record['context_id']!=context_id or record['state']!=state or record['reply']!=reply:
                 raise Conflict('native A2A stream outcome has no matching committed local task')
+            if state==protocol.STATE_COMPLETED:
+                parts=self._haos_a2a_artifacts.parts(task_id)
+                if parts:
+                    payload=protocol.artifact_update(task_id,context_id,'')
+                    payload['artifactUpdate']['artifact']['parts']=parts
+                    self._sse_write(handler,protocol.sse_data(payload,req_id))
             return native_emit(self,handler,task_id,context_id,state,reply,req_id=req_id)
     def sse(self,handler,chunk):
         check()
@@ -241,7 +249,7 @@ def build(value,peer,home,current,policy,tasks,receive):
                 native_task=payload.get('result',{}).get('task')
                 if isinstance(native_task,dict) and native_task.get('status',{}).get('state')==protocol.STATE_SUBMITTED:
                     payload['result']['task']=protocol.TaskStore.to_task(tasks.get(state[2]['target_task_id']))
-            chunk='data: '+json.dumps(decorate(self,payload),ensure_ascii=False)+'\n\n'
+            chunk='data: '+json.dumps(self._haos_a2a_artifacts.decorate(decorate(self,payload)),ensure_ascii=False)+'\n\n'
             if len(chunk.encode())>1024*1024 or tasks.redactor.text(chunk)!=chunk:
                 raise PermissionError('private or excessive native A2A stream metadata')
         return native_sse(handler,chunk)
@@ -250,6 +258,11 @@ def build(value,peer,home,current,policy,tasks,receive):
         check()
         result=native_card(self,public_url=value['tls']['public_url'],agent=self._agents[''])
         result['capabilities']['pushNotifications']=False
+        bindings=[row for row in policy().bindings.values() if row['connector']==tasks.connector]
+        if any(row.get('allow_media') for row in bindings):result['defaultInputModes']+=['application/octet-stream','image/png','image/jpeg']
+        if any(row.get('allow_voice') for row in bindings):result['defaultInputModes']+=['audio/flac','audio/ogg','audio/wav','audio/mpeg','audio/mp4','audio/amr']
+        if any(row.get('allow_video') for row in bindings):result['defaultInputModes']+=['video/mp4','video/3gpp','video/3gpp2']
+        if any(row.get('allow_outbound_media') for row in bindings):result['defaultOutputModes'].append('application/octet-stream')
         return result
     def skills(self,agent=None):return protocol.skills_from_toolsets(['haos_missions'])
     async def close(self):

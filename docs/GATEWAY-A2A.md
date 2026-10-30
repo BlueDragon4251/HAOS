@@ -231,3 +231,35 @@ clarification receipt did not assert background status-file placement; the
 28-case media/process receipt provides that additional evidence. A separate
 23-case component fixture covers native file codecs, first-byte SQLite failure/
 reopen, strict origins, MIME/credential refusal and real HTTP faults.
+
+### Private outgoing artifact path (2026-10-30)
+
+Completed controller groups can project explicit file markers into actual native
+A2A file Parts. The root controller reconstructs and verifies the whole immutable
+chunk group before selecting markers: fenced examples remain text even across
+chunk boundaries, repeated markers select the first snapshot only, and paths do
+not reach the peer. Separate current read and outbound-file approval is required
+before the authenticated agent HTTP reader is called. Without file approval,
+the text includes an approval notice and no artifact URL is generated.
+
+Exact bounded root export offers/chunks become private SQLite blobs tied to the
+original source, task, owner grant, credential epoch and result group. An artifact
+is unavailable until that exact native task outcome has a committed acceptance
+proof. JSON and SSE completion/replay use the actual native file codec. The
+approved HTTPS listener serves only opaque artifact IDs to the same current
+named peer, with fresh authorization during the write, no-store/nosniff and
+attachment headers. A durable local writing/completed/interrupted audit records
+bytes written; it never asserts that a remote person read them.
+
+The 33-case installed UID/controller/TLS fixture covers the actual root export
+reader against a controlled loopback agent-file HTTP endpoint, whole-group
+projection, native file Parts, completed SSE replay, unauthorized/wrong-peer
+refusal and exact TLS bytes. It does not establish the actual upstream agent
+filesystem/session handler or live peer acceptance. A separate nine-case native
+component fixture covers real SQLite insert failure/retry, unfinished task
+refusal, immutable metadata/group replay, blob/acceptance-proof corruption,
+interrupted write accounting, current owner withdrawal and real database/native
+TaskStore reopen. Both are executable checks; the component probe runs in build
+and protocol CI. A2A remains private and the public gateway count stays 13/22;
+long-output handling, ASR composition, callback/owner setup and full activation
+remain outstanding.

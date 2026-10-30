@@ -86,6 +86,8 @@ def build(value,*,parent,connector,policy,inbox):
         facade._haos_a2a_profile=profile;facade._haos_a2a_indexes=indexes;facade._haos_a2a_peers=peers
         facade._haos_a2a_originals=originals
         facade._haos_a2a_check=pinned
+        from .gateway_a2a_output import Output
+        facade._haos_a2a_output=Output(facade)
         def mark(connected):
             with private_scope(profile,{'HERMES_SAFE_MODE':'1'}):
                 if connected:facade._mark_connected(listener_base=value['tls']['public_url'])

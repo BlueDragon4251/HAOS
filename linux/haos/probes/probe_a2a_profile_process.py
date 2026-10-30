@@ -44,7 +44,7 @@ def main():
     with Path('/etc/ssl/certs/ca-certificates.crt').open('ab') as stream:stream.write(b'\n'+(work/'ca.pem').read_bytes())
     with socket.socket() as reserved:reserved.bind(('127.0.0.1',0));port=reserved.getsockname()[1]
     with socket.socket() as reserved:reserved.bind(('127.0.0.1',0));media_port=reserved.getsockname()[1]
-    value={'peer_tokens':{'alice':'private_fixture_alice_'+'a'*32},'port':port,'agent_name':'HAOS',
+    value={'peer_tokens':{'alice':'private_fixture_alice_'+'a'*32,'unpaired':'private_fixture_unpaired_'+'z'*32},'port':port,'agent_name':'HAOS',
         'download_origins':{'alice':['https://localhost:'+str(media_port)]},
         'tls':{'public_url':'https://a2a.fixture.invalid/a2a','certificate':(work/'certificate.pem').read_text(),
             'private_key':(work/'key.pem').read_text(),'bind_host':'127.0.0.1','public_listener':False}}
@@ -54,7 +54,8 @@ def main():
         'capabilities':['create','read'],'allow_media':True,'allow_voice':True,'allow_video':True}
         for name in ['input','auth','rate','drop','revoke']]
     loop_grant={**grant,'id':'loop-check','chat':'ctx-loop-check','identity':'loop-check','capabilities':['create','read']}
-    config={'version':1,'connectors':[{'id':'a2a','platform':'a2a'}],'bindings':[grant,*media_grants,loop_grant]}
+    output_grant={**grant,'id':'output-check','chat':'ctx-output-check','identity':'output-check','capabilities':['create','read'],'allow_outbound_media':True}
+    config={'version':1,'connectors':[{'id':'a2a','platform':'a2a'}],'bindings':[grant,*media_grants,loop_grant,output_grant]}
     etc=Path('/etc/haos');etc.mkdir(mode=0o755)
     def publish(data):
         PreparedA2APolicy(data);temp=etc/'next-policy';temp.write_text(json.dumps(data));temp.chmod(0o640);os.chown(temp,0,65534);temp.replace(etc/'gateways.json')
@@ -138,7 +139,10 @@ async def exercise():
             elif command['method']=='pump':
                 count=0
                 while (d:=await call('gateway.next',{'ready':['a2a']})) is not None:
-                    sent=await adapter.send(d['chat'],d['content'],reply_to=d['reply_to'],metadata=delivery_metadata(d,'a2a'))
+                    metadata=delivery_metadata(d,'a2a')
+                    output=await adapter._haos_a2a_output.prepare(d,call)
+                    if output is not None:metadata['haos_output']=output
+                    sent=await adapter.send(d['chat'],d['content'],reply_to=d['reply_to'],metadata=metadata)
                     assert sent.success and sent.raw_response['recipient_read_verified'] is False
                     await call('gateway.ack',{'id':d['id'],'result':{'attempt':d['attempt'],'status':'delivered','message_id':sent.message_id}})
                     count+=1
@@ -177,7 +181,7 @@ asyncio.run(exercise())
     cases=[]
     async def exercise():
         import httpx
-        from haos.gateway import GatewayEngine
+        from haos.gateway import GatewayEngine,digest
         from haos.gateway_runtime import delivery_metadata
         from haos.store import MissionStore
         from haos.controller import Controller,MAX_FRAME
@@ -219,7 +223,7 @@ asyncio.run(exercise())
             assert not pending.done()
             with sqlite3.connect('file:'+str(base/'relay.db')+'?mode=ro',uri=True) as db:envelope=json.loads(db.execute('SELECT envelope FROM inbox').fetchone()[0])
             assert envelope['message_id']=='client-process-1' and envelope['scope']==grant['scope'] and envelope['sender']=='alice'
-            source=next((base/'profiles').glob('a2a-*/peer-*/tasks.db'))
+            source=next((base/'profiles').glob('a2a-*/peer-'+digest('alice')+'/tasks.db'))
             with sqlite3.connect('file:'+str(source)+'?mode=ro',uri=True) as db:task=db.execute('SELECT task_id FROM a2a_tasks').fetchone()[0]
             assert task.startswith('task-') and task!=envelope['message_id']
             cases.append('actual_native_MessageEvent_preserves_wire_client_deduplication_identity_through_retained_parent_relay')
@@ -416,6 +420,10 @@ asyncio.run(exercise())
             finally:
                 await controller.connection.close();controller.connection=None;controller.current=None
                 backend_server.close();await backend_server.wait_closed()
+            await controller.dispatch('uid:0',{'method':'missions.cancel','params':{'id':fourth_mid}})
+            store.unavailable(fourth_mid,'actual closed fixture question connection before any dispatched prompt')
+            assert store.get(fourth_mid)['state']=='cancelled'
+            await command(process,{'method':'pump'})
             from aiohttp import web
             from video_fixture import movie
             png=base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a5tUAAAAASUVORK5CYII=')
@@ -485,6 +493,77 @@ asyncio.run(exercise())
                 assert again.json()['result']['task']['id']==media_task and fetched==['/image.png','/voice.flac']
                 assert len(store.list())==5 and await command(process,{'method':'counts'})=={'relay':8,'native_committed':8}
                 cases.append('actual_A2A_transferred_media_replay_never_refetches_URI_or_creates_second_input_or_mission')
+                await controller.dispatch('uid:0',{'method':'missions.cancel','params':{'id':media_mid}})
+                await command(process,{'method':'pump'})
+                file_bytes=b'row,value\n'+b'1,reviewed bounded artifact bytes\n'*10000;file_reads=[]
+                artifact_token='private-fixture-hermes-file-capability'
+                store.redactor=__import__('haos.redaction',fromlist=['Redactor']).Redactor([artifact_token,*value['peer_tokens'].values()])
+                async def artifact_read(request):
+                    assert request.headers.get('Authorization')=='Bearer '+artifact_token
+                    assert dict(request.query)=={'session_id':'stored-output-session','path':'./result.csv'}
+                    file_reads.append(dict(request.query))
+                    return web.json_response({'dataUrl':'data:text/csv;base64,'+base64.b64encode(file_bytes).decode()})
+                artifact_app=web.Application();artifact_app.router.add_get('/api/fs/read-data-url',artifact_read)
+                artifact_runner=web.AppRunner(artifact_app,access_log=None);await artifact_runner.setup()
+                artifact_site=web.TCPSite(artifact_runner,'127.0.0.1',0);await artifact_site.start()
+                artifact_port=artifact_site._server.sockets[0].getsockname()[1]
+                controller.url='ws://127.0.0.1:'+str(artifact_port)+'/api/ws?token='+artifact_token
+                try:
+                    output_request={'jsonrpc':'2.0','id':24,'method':'SendMessage','params':{'message':{'messageId':'source-output-files',
+                        'contextId':output_grant['chat'],'role':'ROLE_USER','parts':[{'text':'Controlled root snapshot and authenticated A2A artifact delivery.'}]}}}
+                    pending=asyncio.create_task(client.post(address,headers=headers,json=output_request))
+                    async with asyncio.timeout(10):
+                        while (await command(process,{'method':'counts'}))['relay']!=9:await asyncio.sleep(.02)
+                    output_mid=(await command(process,{'method':'forward'}))['mission_id']
+                    assert store.claim()['id']==output_mid
+                    store.session(output_mid,'runtime-output-session','stored-output-session')
+                    result_text='Full controller text '+('x'*1710)+'\n```text\nMEDIA:./not-an-export.key\n```\nActual file follows.\nMEDIA:./result.csv\nDone.\n'
+                    store.settle(output_mid,'completed',result=result_text)
+                    assert (await command(process,{'method':'pump'}))['delivered']>=3
+                    delivered=(await pending).json()['result']['task']
+                    parts=[part for item in delivered.get('artifacts',[]) for part in item['parts']]
+                    files=[part for part in parts if 'url' in part]
+                    assert len(files)==1 and files[0]['mediaType']=='text/csv' and files[0]['filename'].endswith('.csv')
+                    assert len(file_reads)==1 and './result.csv' not in json.dumps(delivered)
+                    assert 'MEDIA:./not-an-export.key' in json.dumps(delivered)
+                    path=__import__('urllib.parse',fromlist=['urlsplit']).urlsplit(files[0]['url']).path
+                    unauthenticated=await client.get(address.removesuffix('/a2a')+path,headers={'Host':'a2a.fixture.invalid'})
+                    assert unauthenticated.status_code==401
+                    other=await client.get(address.removesuffix('/a2a')+path,headers={'Host':'a2a.fixture.invalid','Authorization':'Bearer '+value['peer_tokens']['unpaired']})
+                    assert other.status_code==404
+                    download=await client.get(address.removesuffix('/a2a')+path,headers=headers)
+                    assert download.status_code==200 and download.content==file_bytes
+                    assert download.headers['content-type']=='text/csv' and download.headers['x-content-type-options']=='nosniff'
+                    assert download.headers['cache-control']=='no-store' and 'attachment;' in download.headers['content-disposition']
+                    assert artifact_token not in json.dumps(delivered) and len(file_reads)==1
+                    async with client.stream('POST',address,headers=headers,json={**output_request,'id':26,'method':'SendStreamingMessage'}) as replay:
+                        replayed=[]
+                        async for frame in replay.aiter_lines():
+                            if frame.startswith('data:'):replayed.append(json.loads(frame[5:]))
+                        repeated_parts=[part for item in replayed[0]['result']['task']['artifacts'] for part in item['parts'] if 'url' in part]
+                        assert repeated_parts==files and len(file_reads)==1
+                    cases.append('actual_completed_task_SSE_replay_preserves_native_file_Parts_without_second_agent_file_read')
+                    cases.append('actual_root_export_manifest_preserves_cross_chunk_code_examples_and_only_explicit_real_file_uses_bounded_authenticated_agent_HTTP_reader')
+                    cases.append('actual_native_Task_file_Parts_and_TLS_artifact_endpoint_deliver_exact_snapshot_only_to_current_named_peer_without_paths_or_credentials')
+                    audit_db=source
+                    with sqlite3.connect('file:'+str(audit_db)+'?mode=ro',uri=True) as db:
+                        logged=db.execute("SELECT state,written,size FROM a2a_artifact_reads WHERE state='stream-written'").fetchall()
+                        assert logged==[('stream-written',len(file_bytes),len(file_bytes))]
+                    cases.append('actual_artifact_download_has_durable_local_write_audit_without_claiming_remote_recipient_read')
+                    no_output=json.loads(json.dumps(output_request));no_output['id']=25
+                    no_output['params']['message'].update({'messageId':'source-without-file-grant','contextId':grant['chat']})
+                    pending=asyncio.create_task(client.post(address,headers=headers,json=no_output))
+                    async with asyncio.timeout(10):
+                        while (await command(process,{'method':'counts'}))['relay']!=10:await asyncio.sleep(.02)
+                    without_mid=(await command(process,{'method':'forward'}))['mission_id']
+                    assert store.claim()['id']==without_mid;store.session(without_mid,'runtime-without-files','stored-without-files')
+                    store.settle(without_mid,'completed',result='Text result remains public.\nMEDIA:./result.csv')
+                    await command(process,{'method':'pump'});without=(await pending).json()['result']['task']
+                    assert without['status']['state']==protocol.STATE_COMPLETED and 'separate owner approval' in json.dumps(without)
+                    assert './result.csv' not in json.dumps(without) and not any('url' in part for item in without.get('artifacts',[]) for part in item['parts'])
+                    assert len(file_reads)==1
+                    cases.append('separate_outbound_file_grant_is_required_before_any_root_snapshot_read_or_native_artifact_URL')
+                finally:await artifact_runner.cleanup()
                 # Five actual accepted native turns followed by its real sixth-
                 # turn anti-loop rejection. The private recovery loop must not
                 # turn that rejected native source into a fresh root mission.
@@ -493,7 +572,7 @@ asyncio.run(exercise())
                         'messageId':'loop-source-'+str(index),'contextId':loop_grant['chat'],'role':'ROLE_USER','parts':[{'text':'Controlled local loop contract '+str(index)}]}}}
                     pending=asyncio.create_task(client.post(address,headers=headers,json=loop_request))
                     async with asyncio.timeout(10):
-                        while (await command(process,{'method':'counts'}))['relay']!=9+index:await asyncio.sleep(.02)
+                        while (await command(process,{'method':'counts'}))['relay']!=11+index:await asyncio.sleep(.02)
                     loop_mid=(await command(process,{'method':'forward'}))['mission_id']
                     # The fixture root is the configured owner (allowed UID 0).
                     # Cancel queued test goals through the real owner dispatch;
@@ -507,7 +586,7 @@ asyncio.run(exercise())
                 rejected=(await client.post(address,headers=headers,json=refused_loop)).json()['result']['task']
                 assert rejected['status']['state']==protocol.STATE_REJECTED
                 await asyncio.sleep(.3)
-                assert len(store.list())==10 and await command(process,{'method':'counts'})=={'relay':13,'native_committed':13}
+                assert len(store.list())==12 and await command(process,{'method':'counts'})=={'relay':15,'native_committed':15}
                 cases.append('actual_native_sixth_turn_anti_loop_rejection_is_never_replayed_by_private_pending_input_recovery_into_a_root_mission')
                 for name,status in [('auth',401),('rate',429)]:
                     mode['status']=status
@@ -524,8 +603,8 @@ asyncio.run(exercise())
                         async with asyncio.timeout(5):
                             while len(fetched)!=before+1:await asyncio.sleep(.02)
                     await asyncio.sleep(.3)
-                    assert len(fetched)==before+1 and len(store.list())==10
-                    assert (await command(process,{'method':'counts'}))['relay']==13
+                    assert len(fetched)==before+1 and len(store.list())==12
+                    assert (await command(process,{'method':'counts'}))['relay']==15
                     cases.append('actual_A2A_HTTPS_'+str(status)+'_retains_native_input_and_blocks_automatic_resource_refetch_without_mission')
                 waiting={'jsonrpc':'2.0','id':23,'method':'SendStreamingMessage','params':{'message':{'messageId':'media-revoke-stalled',
                     'contextId':'ctx-media-revoke','role':'ROLE_USER','parts':[{'url':'https://localhost:'+str(media_port)+'/stall',
@@ -543,7 +622,7 @@ asyncio.run(exercise())
                 with sqlite3.connect('file:'+str(source)+'?mode=ro',uri=True) as db:
                     record,receipt=db.execute('SELECT record,admitted_receipt FROM a2a_tasks WHERE task_id=?',(stalled_task,)).fetchone()
                     assert json.loads(record)['state']==protocol.STATE_WORKING and receipt==''
-                assert len(store.list())==10 and (await command(process,{'method':'counts'}))['relay']==13
+                assert len(store.list())==12 and (await command(process,{'method':'counts'}))['relay']==15
                 cases.append('actual_owner_withdrawal_cancels_stalled_HTTPS_resource_reader_and_native_dispatch_without_partial_media_mission_or_fake_terminal_task')
             finally:released.set();release_stall.set();await media_runner.cleanup()
             changed={**config,'bindings':[{**grant,'generation':'b'*64}]};publish(changed)

@@ -45,7 +45,7 @@ def marked(content):
 
 def approved(policy,row):
     binding=policy.current_binding(dict(row))
-    if (policy.connectors.get(binding['connector'],{}).get('platform') not in {'line','sms','email','feishu','dingtalk'}
+    if (policy.connectors.get(binding['connector'],{}).get('platform') not in {'line','sms','email','feishu','dingtalk','a2a'}
             or binding.get('allow_outbound_media') is not True or 'read' not in binding['capabilities']
             or not binding.get('generation') or type(binding.get('since')) is not int):
         raise PermissionError('separate current output-file/read approval required')
@@ -61,6 +61,37 @@ class Exports:
             source_session TEXT NOT NULL,sha256 TEXT NOT NULL,size INTEGER NOT NULL,
             data BLOB NOT NULL,created_at REAL NOT NULL)''')
         self.lock=asyncio.Lock()
+
+    def manifest(self,params):
+        if not isinstance(params,dict) or set(params)!={'delivery','attempt'}:raise ValueError('exact controller output manifest request required')
+        delivery_id=params['delivery'];attempt=params['attempt']
+        if not isinstance(delivery_id,str) or not _HASH.fullmatch(delivery_id) or type(attempt) is not int or not 1<=attempt<=5:
+            raise ValueError('exact in-flight controller output attempt required')
+        row=self.db.execute('''SELECT o.*,r.binding_id,r.binding_digest,r.mission_id,r.connector
+            FROM gateway_outbox o JOIN gateway_routes r ON r.id=o.route_id WHERE o.id=?''',(delivery_id,)).fetchone()
+        policy=self.controller.gateway_policy()
+        if row is None or row['state']!='sending' or row['attempt']!=attempt or row['lease_until']<=time.time():
+            raise Conflict('controller output manifest is not in flight')
+        binding=policy.current_binding(dict(row))
+        if policy.connectors[binding['connector']]['platform']!='a2a' or 'read' not in binding['capabilities']:
+            raise PermissionError('exact current A2A output read grant required')
+        from .gateway_event_context import load
+        context=load(self.store,dict(row))
+        if context['kind']!='mission.completed':raise PermissionError('controller completed-output event required')
+        rows=self.db.execute('''SELECT o.* FROM gateway_outbox o JOIN gateway_delivery_context c ON c.delivery_id=o.id
+            WHERE o.route_id=? AND json_extract(c.metadata,'$.group_sha256')=? ORDER BY json_extract(c.metadata,'$.part')''',
+            (row['route_id'],context['group_sha256'])).fetchall()
+        if len(rows)!=context['parts']:raise Conflict('controller output manifest lacks complete original chunks')
+        chunks=[]
+        for index,item in enumerate(rows):
+            meta=load(self.store,dict(item))
+            if meta['part']!=index or meta['group_sha256']!=context['group_sha256']:raise Conflict('controller output manifest changed chunk sequence')
+            chunks.append(item['content'])
+        if digest([row['route_id'],context['source_event'],chunks])!=context['group_sha256']:
+            raise Conflict('controller output manifest changed source event or original bytes')
+        from .gateway_output_projection import project
+        selected=project(chunks)[context['part']]
+        return {**selected,'source_sha256':context['content_sha256'],'group_sha256':context['group_sha256']}
 
     def current(self,delivery_id,attempt):
         if (not isinstance(delivery_id,str) or not _HASH.fullmatch(delivery_id)
@@ -80,7 +111,10 @@ class Exports:
         path=params['path']
         async with self.lock:
             row,mission=self.current(params['delivery'],params['attempt'])
-            if path not in marked(row['content'])[0] or path not in marked(mission['result'])[0]:
+            binding=self.controller.gateway_policy().current_binding(dict(row))
+            paths=(self.manifest({'delivery':params['delivery'],'attempt':params['attempt']})['paths']
+                if self.controller.gateway_policy().connectors[binding['connector']]['platform']=='a2a' else marked(row['content'])[0])
+            if path not in paths or path not in marked(mission['result'])[0]:
                 raise PermissionError('artifact is not explicitly marked in this immutable mission output')
             identity=digest([row['id'],row['binding_digest'],mission['stored_session_id'],path])
             prior=self.db.execute('SELECT * FROM gateway_output_files WHERE id=?',(identity,)).fetchone()

@@ -26,10 +26,13 @@ class Publisher:
         self.db.execute('''CREATE TABLE IF NOT EXISTS a2a_controller_parts(
             task_id TEXT NOT NULL,group_id TEXT NOT NULL,part INTEGER NOT NULL,delivery_id TEXT NOT NULL UNIQUE,
             content TEXT NOT NULL,sha256 TEXT NOT NULL,PRIMARY KEY(task_id,group_id,part))''')
+        self.db.execute('''CREATE TABLE IF NOT EXISTS a2a_controller_projections(
+            delivery_id TEXT PRIMARY KEY,projection TEXT NOT NULL,sha256 TEXT NOT NULL)''')
 
     def collect(self,chat,content,reply_to,metadata):
         self.tasks.current()
-        if (not isinstance(metadata,dict) or set(metadata)!={'notify','haos_scope','haos_binding','haos_delivery_id','haos_delivery_attempt','haos_event_context'}
+        required={'notify','haos_scope','haos_binding','haos_delivery_id','haos_delivery_attempt','haos_event_context'}
+        if (not isinstance(metadata,dict) or not required<=set(metadata)<=required|{'haos_output'}
                 or metadata['notify'] is not True or not isinstance(content,str) or not content or len(content.encode())>32000
                 or self.tasks.redactor.text(content)!=content or not isinstance(reply_to,str)
                 or type(metadata['haos_delivery_attempt']) is not int or not 1<=metadata['haos_delivery_attempt']<=2**31
@@ -50,14 +53,25 @@ class Publisher:
             task=row['task_id'];route=digest([context['mission_id'],row['binding_id'],row['binding_digest']])
             if metadata['haos_delivery_id']!=digest([route,context['source_event'],context['part']]):
                 raise Conflict('controller delivery identity does not match its exact event and part')
-            identity=(task,source,context['mission_id'],route,row['binding_digest'],row['credential_scope'])
+            route_identity=(task,source,context['mission_id'],route,row['binding_digest'],row['credential_scope'])
             group=context['group_sha256'];base={k:v for k,v in context.items() if k not in {'part','content_sha256'}}
             encoded=json.dumps(base,sort_keys=True,separators=(',',':'),ensure_ascii=False)
+            projection=metadata.get('haos_output',{'text':content,'artifact_ids':[],'source_sha256':checksum})
+            if (not isinstance(projection,dict) or set(projection)!={'text','artifact_ids','source_sha256'}
+                    or not isinstance(projection['text'],str) or len(projection['text'].encode())>32000
+                    or self.tasks.redactor.text(projection['text'])!=projection['text'] or projection['source_sha256']!=checksum
+                    or not isinstance(projection['artifact_ids'],list) or len(projection['artifact_ids'])>4
+                    or any(not isinstance(identity,str) or not HASH.fullmatch(identity) for identity in projection['artifact_ids'])
+                    or len(set(projection['artifact_ids']))!=len(projection['artifact_ids'])):
+                raise Conflict('controller output projection changed source bytes, file receipt or bounded text')
+            for artifact_id in projection['artifact_ids']:
+                self.adapter._haos_a2a_artifacts.prepared(artifact_id,task,group,metadata['haos_delivery_id'])
+            projected=json.dumps(projection,sort_keys=True,separators=(',',':'),ensure_ascii=False)
             self.db.execute('BEGIN IMMEDIATE')
             try:
                 old=self.db.execute('SELECT * FROM a2a_controller_routes WHERE task_id=?',(task,)).fetchone()
-                if old is not None and tuple(old)!=identity:raise Conflict('native A2A task cannot change controller mission or owner route')
-                if old is None:self.db.execute('INSERT INTO a2a_controller_routes VALUES(?,?,?,?,?,?)',identity)
+                if old is not None and tuple(old)!=route_identity:raise Conflict('native A2A task cannot change controller mission or owner route')
+                if old is None:self.db.execute('INSERT INTO a2a_controller_routes VALUES(?,?,?,?,?,?)',route_identity)
                 prior=self.db.execute('SELECT * FROM a2a_controller_groups WHERE task_id=? AND group_id=?',(task,group)).fetchone()
                 if prior is not None and (prior['context']!=encoded or prior['state'] not in {'collecting','committed'}):
                     raise Conflict('controller event group changed its manifest')
@@ -69,6 +83,10 @@ class Publisher:
                 wanted=(task,group,context['part'],metadata['haos_delivery_id'],content,checksum)
                 if part is not None and tuple(part)!=wanted:raise Conflict('controller event part changed after local queue custody')
                 if part is None:self.db.execute('INSERT INTO a2a_controller_parts VALUES(?,?,?,?,?,?)',wanted)
+                old_projection=self.db.execute('SELECT projection,sha256 FROM a2a_controller_projections WHERE delivery_id=?',(metadata['haos_delivery_id'],)).fetchone()
+                if old_projection is not None and tuple(old_projection)!=(projected,digest(projection)):
+                    raise Conflict('A2A output projection changed after local chunk custody')
+                if old_projection is None:self.db.execute('INSERT INTO a2a_controller_projections VALUES(?,?,?)',(metadata['haos_delivery_id'],projected,digest(projection)))
                 parts=self.db.execute('SELECT * FROM a2a_controller_parts WHERE task_id=? AND group_id=? ORDER BY part',(task,group)).fetchall()
                 if len(parts)>context['parts']:raise Conflict('controller event has excess chunks')
                 body=None
@@ -78,7 +96,20 @@ class Publisher:
                             or sum(len(c.encode()) for c in chunks)!=context['total_bytes']
                             or digest([route,context['source_event'],chunks])!=group):
                         raise Conflict('complete controller event does not match its original manifest')
-                    body=''.join(chunks)
+                    rendered=[];artifacts=[]
+                    for item in parts:
+                        saved=self.db.execute('SELECT projection,sha256 FROM a2a_controller_projections WHERE delivery_id=?',(item['delivery_id'],)).fetchone()
+                        if saved is None:raise Conflict('A2A result lacks an immutable output projection')
+                        try:value=json.loads(saved['projection'])
+                        except (ValueError,RecursionError):raise Conflict('damaged A2A output projection') from None
+                        if digest(value)!=saved['sha256'] or value['source_sha256']!=item['sha256']:raise Conflict('A2A output projection proof changed')
+                        for identity in value['artifact_ids']:
+                            self.adapter._haos_a2a_artifacts.prepared(identity,task,group,item['delivery_id'])
+                        rendered.append(value['text']);artifacts.extend(value['artifact_ids'])
+                    if len(artifacts)>4 or len(set(artifacts))!=len(artifacts):raise Conflict('complete A2A result has an invalid attachment set')
+                    body=''.join(rendered)
+                    if len(body.encode())>32000:raise Conflict('projected A2A task reply exceeds its bounded native limit')
+                    if not body:body='Result files attached.' if artifacts else 'Result contains no public text.'
                 self.tasks.current();self.db.execute('COMMIT')
             except BaseException:
                 if self.db.in_transaction:self.db.execute('ROLLBACK')

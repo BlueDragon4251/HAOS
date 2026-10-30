@@ -127,9 +127,10 @@ class Controller:
             return self.gateway.media.begin(policy,params)
         if request.get('method')=='gateway.media.chunk':
             return self.gateway.media.chunk(policy,params)
-        if request.get('method') in {'gateway.output.begin','gateway.output.chunk'}:
+        if request.get('method') in {'gateway.output.begin','gateway.output.chunk','gateway.output.manifest'}:
             from .gateway_outbound import Exports
             if not hasattr(self,'gateway_exports'):self.gateway_exports=Exports(self)
+            if request['method']=='gateway.output.manifest':return self.gateway_exports.manifest(params)
             if request['method']=='gateway.output.begin':return await self.gateway_exports.begin(params)
             return self.gateway_exports.chunk(params)
         if request.get("method") == "gateway.next":

@@ -93,7 +93,8 @@ class Server:
                     payload={key:part for key,part in payload.items() if key!='served_agents'}
                 if getattr(self,'_adapter',None) is not None:
                     from .gateway_a2a_question import decorate
-                    with self.adapter._haos_a2a_final_lock:payload=decorate(self.adapter,payload)
+                    with self.adapter._haos_a2a_final_lock:
+                        payload=self.adapter._haos_a2a_artifacts.decorate(decorate(self.adapter,payload))
                 encoded=json.dumps(payload,ensure_ascii=False)
                 if broker.redactor.text(encoded)!=encoded:
                     raise PermissionError('private A2A credential in native JSON response')
@@ -104,6 +105,24 @@ class Server:
                 self._sent_headers=False;self.close_connection=True
                 try:
                     self.guard()
+                    if self.path.startswith('/a2a/artifacts/'):
+                        peer=broker.security.authenticate(self.headers.get('Authorization'),self._client_ip())
+                        if peer is None:return self._json(401,{'error':'unauthorized'})
+                        self._adapter=broker.adapters[peer]
+                        identity=self.path.removeprefix('/a2a/artifacts/')
+                        try:item=self.adapter._haos_a2a_artifacts.get(identity)
+                        except (PermissionError,Conflict):return self._json(404,{'error':'artifact unavailable'})
+                        artifact=self.adapter._haos_a2a_artifacts;receipt=artifact.begin_read(item);written=0;complete=False
+                        try:
+                            self.send_response(200);self.send_header('Content-Type',item['mime']);self.send_header('Content-Length',str(item['size']))
+                            self.send_header('Cache-Control','no-store');self.send_header('X-Content-Type-Options','nosniff')
+                            self.send_header('Content-Security-Policy',"default-src 'none'; sandbox")
+                            self.send_header('Content-Disposition','attachment; filename="'+item['name']+'"');self.end_headers()
+                            while written<item['size']:
+                                broker.current();artifact.current(item['task_id'])
+                                block=item['data'][written:written+48*1024];self.wfile.write(block);self.wfile.flush();written+=len(block)
+                            complete=True;return
+                        finally:artifact.finish_read(receipt,written,complete)
                     routes={'/a2a':'/','/a2a/health':'/health',
                         '/.well-known/agent-card.json':'/.well-known/agent-card.json','/.well-known/agent.json':'/.well-known/agent.json',
                         '/a2a/.well-known/agent-card.json':'/.well-known/agent-card.json','/a2a/.well-known/agent.json':'/.well-known/agent.json'}
