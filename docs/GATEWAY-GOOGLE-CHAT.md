@@ -171,3 +171,30 @@ rearm it. GET404 alone continues to mean unknown delivery.
 
 These are prepared private contracts, not a completed Owner GUI/backend or
 production-daemon integration. They do not change the 15/22 public count.
+
+## Prepared Owner recovery handoff and controls
+
+The prepared Root backend stops the gateway service, checks its inactive state,
+loads a matched Root-owned policy/private credential publication and starts one
+fixed installed Python 3.11 worker with `-E -s`, the actual gateway UID/GID and no
+supplementary groups. The worker requires its live Root parent (PID1 is refused),
+sets parent-death SIGKILL, NoNewPrivs and resource/time bounds, then checks fresh
+publication authority and the real profile flock. It neither imports optional
+Google SDKs nor performs account/network operations. Inputs/actions and returned
+metadata use closed schemas; only bounded payload-free receipts return to Root.
+Root and private journals record the authenticated actor and decision hashes.
+
+Prepared Tk recovery controls call these backend functions for retained-profile
+selection, original inspection/disposal, per-part reply approval and auth-block
+recheck. Snapshot selection and profile/connector changes invalidate earlier
+consent. Late asynchronous results from a different selection are discarded,
+and unexpected payload fields are rejected before rendering. These controls are
+still outside the public gateway page pending the complete account/media/OAuth
+integration; they are not a full Google Chat setup path yet.
+
+The disposable Owner-process fixture uses real Linux identities, parent
+credentials, flock, FULL SQLite and kernel parent-death behavior. Only the
+systemctl service state is an explicit fixture; this does not prove installed
+systemd quiescence or Owner login. Tk desktop/compact fixtures exercise actual
+widgets and the wizard's asynchronous queue with explicit privileged backend
+fixtures. Neither is a live Google account, installed GUI or release acceptance.

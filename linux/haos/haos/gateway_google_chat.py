@@ -118,3 +118,20 @@ def validate_overlaps(policy):
         if previous and (binding.get('all_threads') is True or any(row.get('all_threads') is True for row in previous)):
             raise ValueError('Google Chat whole-space thread approval cannot overlap another grant for this sender/account/space')
         previous.append(binding)
+
+
+def authority(connector,value,expected=None):
+    """Fresh root-owned publication; private credentials arrive via Root IPC."""
+    from pathlib import Path
+    from .gateway_publication import pending
+    from .sandbox import trusted_json
+    value=credentials(value);config=Path('/etc/haos')
+    if pending(config):raise PermissionError('Google Chat Owner publication requires recovery')
+    raw=trusted_json(config/'gateways.json');selected=PreparedGoogleChatPolicy(raw)
+    if selected.connectors.get(connector,{}).get('platform')!='google_chat':raise PermissionError('exact prepared Google Chat connector required')
+    for binding in selected.bindings.values():
+        if binding['connector']==connector and (binding['scope']!=scope(value) or binding['sender']==value['bot_user']):
+            raise PermissionError('Google Chat grant differs from saved account or expected bot')
+    pin=digest(raw)
+    if pending(config) or expected is not None and expected!=pin:raise PermissionError('Google Chat Owner publication changed')
+    return pin
