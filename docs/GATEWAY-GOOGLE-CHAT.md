@@ -78,28 +78,17 @@ local relay handoff, not a root-controller mission or live inference.
 
 ## Remaining before public activation
 
-- Full production-daemon/root-socket acceptance of the prepared private profile,
-  with the complete private Pub/Sub lifecycle now tested separately below.
-- Durable native dispatch into the independent root mission/controller queue,
-  cancellation, outbox authority and inspected owner recovery/status/logout.
-- Safe input attachments, local voice and video, sealed controller-exported
-  outputs, per-user OAuth setup/refresh/revocation and native upload. The pinned
-  adapter requires user OAuth for uploads; service-account auth alone does not
-  provide native file delivery. No chat-triggered setup may grant HAOS rights.
-- Complete usable owner account/pairing/media/OAuth/recovery GUI, CLI, installed
-  packaging, full kernel/UID/process lifecycle and production end-to-end tests.
-
-The optional frozen `google-chat` extra is installed only in the dedicated local
-validation environment and dedicated prepared-contract CI workflow. Installed
-runtime extras have not been expanded yet. No runtime package versions or
-hash-pinned HAOS overlay dependencies were updated.
-
-Source-bound evidence:
-[prepared contracts](evidence/2026-10-30/google-chat-private-primitives-validation.json)
-and [actual UID receive/relay checks](evidence/2026-10-30/google-chat-private-receive-validation.json).
-Loopback HTTP, certificate and SDK ACK-queue fixtures do not establish live
-account privileges, subscription authorization, public callbacks, inference,
-external recipient delivery/read status, installed OS or release acceptance.
+- Complete production `gateway_runtime.serve`/public factory integration and
+  installed systemd acceptance; private profile loops and actual separate
+  controller Unix IPC are tested below.
+- Historical account/token/output association and Owner cleanup after key
+  rotation or connector removal, without discarding existing custody.
+- Complete usable Owner account/pairing/media/OAuth/recovery GUI and CLI, and
+  frozen installed SDK packaging. Existing prepared OAuth/file/recovery forms
+  are components rather than a complete public Google Chat setup path.
+- Full source-consistent regression, kernel/process/GUI/build gates for that
+  public activation. Live Google account/consent/delivery acceptance stays
+  separate from the local SDK fixtures.
 
 ## Private lifecycle and reply checkpoint
 
@@ -490,3 +479,38 @@ installed systemd acceptance remain open. This is no live Google or model test.
 
 Exact-source receipts: [full Pub/Sub profile](evidence/2026-10-30/google-chat-private-full-pubsub-profile-validation.json)
 and [separate controller Unix IPC](evidence/2026-10-30/google-chat-private-controller-ipc-validation.json).
+
+
+## Google voice and video through separate local processes
+
+The media process scenes now retrieve a real bounded FLAC or synthetic MP4 via
+actual Google discovery `MediaIoBaseDownload`, using correct512KiB range replies.
+The native Google codec retains the source-bound attachment; the gateway sends
+exact bytes through the kernel-authenticated Unix controller interface. The
+separate controller calls its actual `execute` method. For voice this invokes
+`speech_client.transcribe` and the actual socket-activated speech service under
+UID65530 with the exact pinned local Whisper model. Only the verified transcript
+enters the prompt, with no raw voice file attachment. FULL transcript custody
+binds the result to the original audio checksum and model revision.
+
+The video scene calls the actual separate decoder service for a bounded PyAV
+thumbnail, validates the original source checksum/dimensions/duration, then
+exercises actual Controller/HermesConnection attachment transfer of the original
+MP4. The WebSocket peer in these tests is an explicit local protocol-service
+fixture: it validates attachment bytes and prompt contents, returns a streaming
+acknowledgment and a labelled fixture terminal event. This verifies local byte,
+process and protocol handling, not actual Hermes inference or model video
+understanding. Replayed and unknown sources start no second download or prompt.
+
+
+A separate voice-withdrawal scene waits for the real native STT child to start,
+then atomically withdraws the Root grant. The actual speech client cancels its
+socket request and the service joins the native child. No transcript is stored,
+no prompt is submitted, no completion is fabricated, and original custody stays
+intact. The speech service remains available. This scene passed twice. The
+fixture relay now handles a concurrently revoked publication just as the
+production loop does; errors under unchanged authority still fail the test.
+An earlier fixture loop exited on that intentional refusal after the worker had
+already stopped and left a stale status marker; no production gate was relaxed.
+
+Exact-source receipt: [native voice/video, withdrawal and media regressions](evidence/2026-10-30/google-chat-private-local-media-validation.json).

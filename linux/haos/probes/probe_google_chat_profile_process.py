@@ -78,18 +78,40 @@ def main():
     binding={'id':'owner','connector':'google','sender':'users/123','chat':'spaces/room1','thread':'spaces/room1/threads/thread1',
         'scope':scope(value),'identity':'personal','capabilities':['create','read'],'generation':'a'*64,'since':int(now.timestamp()*1000)-60000}
     policy={'version':1,'connectors':[{'id':'google','platform':'google_chat'}],'bindings':[binding]}
-    publication=directory/'policy.json';publication.write_text(json.dumps(policy));publication.chmod(0o644)
+    publication=directory/'policy.json'
+    def publish(selected):
+        pending=directory/'policy.next';pending.write_text(json.dumps(selected));pending.chmod(0o644);pending.replace(publication)
+    publish(policy)
     original_path=profile/('google-chat-'+digest(scope(value)))/'originals.sqlite'
     scenario=os.environ.get('HAOS_GOOGLE_CHAT_PROFILE_ACCOUNT','active')
-    if scenario not in {'active','auth','rate','tokenrate','sendauth','media','mediaauth','mediarate','mediarange','medialarge','pubsub','pubsubauth','pubsubrate','pubsubdisconnect'}:raise ValueError('finite private profile fixture scenario required')
-    if scenario in {'media','mediaauth','mediarate','mediarange','medialarge'}:
-        binding['allow_media']=True;publication.write_text(json.dumps(policy));publication.chmod(0o644)
+    if scenario not in {'active','auth','rate','tokenrate','sendauth','media','mediaauth','mediarate','mediarange','medialarge','pubsub','pubsubauth','pubsubrate','pubsubdisconnect','voice','video'}:raise ValueError('finite private profile fixture scenario required')
+    if scenario in {'media','mediaauth','mediarate','mediarange','medialarge','voice','video'}:
+        binding['allow_media']=True;publish(policy)
     import base64
     image=base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aF10AAAAASUVORK5CYII=')
-    api_calls=[];api_requests=[]
+    api_calls=[];api_requests=[];api_payloads=[]
     controller_ipc=os.environ.get('HAOS_GOOGLE_CHAT_CONTROLLER_IPC','0')
     if controller_ipc not in {'0','1'}:raise ValueError('explicit private controller fixture mode required')
     controller_ipc=controller_ipc=='1'
+    media_revoke=os.environ.get('HAOS_GOOGLE_CHAT_MEDIA_REVOKE','0')
+    if media_revoke not in {'0','1'} or media_revoke=='1' and scenario!='voice':raise ValueError('explicit Google voice revocation fixture mode required')
+    media_revoke=media_revoke=='1'
+    speech_fixture=None
+    if scenario in {'voice','video'}:
+        if not controller_ipc:raise PermissionError('Google speech/video acceptance requires actual separate controller IPC')
+        sys.path.insert(0,'/repo/linux/haos/runtime')
+        if scenario=='voice':
+            import hashlib
+            image=Path('/public-input/reference.flac').read_bytes()
+            assert hashlib.sha256(image).hexdigest()=='63a4b1e4c1dc655ac70961ffbf518acd249df237e5a0152faae9a4a836949715'
+        else:
+            from video_fixture import movie
+            image=movie()
+        binding.pop('allow_media',None);binding['allow_voice' if scenario=='voice' else 'allow_video']=True
+        publish(policy)
+        from google_chat_media_fixture import SpeechFixture
+        speech_fixture=SpeechFixture(runtime/'bin/python',model=scenario=='voice')
+    media_mime={'voice':'audio/flac','video':'video/mp4'}.get(scenario,'image/png')
     pubsub_server=None;pubsub_port=0;pubsub_calls=[]
     import queue
     pubsub_messages=queue.Queue();pubsub_active=[0];pubsub_lock=threading.Lock();pubsub_fault={'mode':None,'calls':0,'held':False,'cancelled':False}
@@ -176,7 +198,7 @@ def main():
                 if scenario=='sendauth':
                     api_calls.append('native-message-auth-refused');data=json.dumps({'error':{'code':401,'message':'local-profile-google-fixture-token'}}).encode()
                     self.send_response(401);self.send_header('Content-Type','application/json');self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data);return
-                api_calls.append('native-message-create')
+                api_calls.append('native-message-create');api_payloads.append(body)
                 self.response({'name':'spaces/room1/messages/server.'+str(api_calls.count('native-message-create')),
                     'clientAssignedMessageId':query['messageId'][0],'text':body['text'],'thread':body['thread']});return
             assert self.path=='/oauth-token' and not self.headers.get('Authorization')
@@ -197,9 +219,13 @@ def main():
                 if scenario=='rate':self.send_header('Retry-After','180')
                 self.end_headers();self.wfile.write(data);return
             if urlsplit(self.path).path.startswith('/v1/media/'):
-                assert scenario in {'media','mediaauth','mediarate','mediarange','medialarge'} and self.headers.get('Authorization')=='Bearer local-profile-google-fixture-token'
+                assert scenario in {'media','mediaauth','mediarate','mediarange','medialarge','voice','video'} and self.headers.get('Authorization')=='Bearer local-profile-google-fixture-token'
                 assert urlsplit(self.path).path in ['/v1/media/spaces/room1/messages/'+mid+'/attachments/resource1' for mid in ['shared','diskretry']]
-                assert parse_qs(urlsplit(self.path).query)=={'alt':['media']} and self.headers.get('Range')=='bytes=0-524287'
+                assert parse_qs(urlsplit(self.path).query)=={'alt':['media']}
+                import re
+                match=re.fullmatch('bytes=([0-9]+)-([0-9]+)',self.headers.get('Range',''));assert match
+                start,end=map(int,match.groups());assert end-start+1==524288 and start%524288==0
+                payload=image[start:min(len(image),end+1)];assert payload
                 if scenario in {'mediaauth','mediarate'}:
                     code=401 if scenario=='mediaauth' else 429;api_calls.append('native-media-'+str(code))
                     body=json.dumps({'error':{'code':code,'message':'local-profile-google-fixture-token'}}).encode()
@@ -213,9 +239,9 @@ def main():
                     self.end_headers()
                     if scenario=='mediarange':self.wfile.write(image)
                     return
-                api_calls.append('native-media-download');self.send_response(206);self.send_header('Content-Type','image/png')
-                self.send_header('Content-Length',str(len(image)));self.send_header('Content-Range','bytes 0-'+str(len(image)-1)+'/'+str(len(image)))
-                self.end_headers();self.wfile.write(image);return
+                api_calls.append('native-media-download');self.send_response(206);self.send_header('Content-Type',media_mime)
+                self.send_header('Content-Length',str(len(payload)));self.send_header('Content-Range','bytes '+str(start)+'-'+str(start+len(payload)-1)+'/'+str(len(image)))
+                self.end_headers();self.wfile.write(payload);return
             assert urlsplit(self.path).path=='/v1/spaces/room1/members/999'
             assert self.headers.get('Authorization')=='Bearer local-profile-google-fixture-token'
             api_calls.append('own-bot-membership');self.response({'name':'spaces/room1/members/999','state':'MEMBER','member':{'name':'users/999','type':'BOT'}})
@@ -350,33 +376,38 @@ async def run():
                 assert await adapter.connect() and adapter.native_health()['status']==connected_status
                 restarted=True
             if adapter.is_connected:
-                incoming=relay.next(policy())
-                if incoming:
-                    from haos.gateway_media_relay import forward,MediaCache
-                    async def local_call(method,params):
-                        if method=='gateway.media.begin':return controller.gateway.media.begin(policy(),params)
-                        if method=='gateway.media.chunk':return controller.gateway.media.chunk(policy(),params)
-                        assert method=='gateway.receive'
-                        return await controller.gateway.receive(policy(),params['connector'],params['envelope'],controller,media=params.get('media'))
-                    received=await forward(policy,'google',incoming['envelope'],incoming['media'],MediaCache(inbox),call if v['controller_ipc'] else local_call)
-                    if incoming['media'] and not v['controller_ipc']:
-                        prepared=controller.gateway.media.for_mission(policy(),received['mission_id'])
-                        assert len(prepared)==1 and prepared[0]['descriptor']['kind']=='image'
-                        assert prepared[0]['data']==__import__('base64').b64decode(v['image'])
-                    relay.admitted(incoming['id'],received['mission_id'])
-                delivery=await call('gateway.next',{'ready':['google']}) if v['controller_ipc'] else controller.gateway.next_delivery(policy())
-                if delivery:
-                    metadata=delivery_metadata(delivery,'google_chat')
-                    try:result=await adapter.send(delivery['chat'],delivery['content'],reply_to=delivery['reply_to'],metadata=metadata)
-                    except PermissionError:
-                        if v['scenario']!='sendauth':raise
-                        result=None
-                    if v['scenario']=='sendauth':assert result is None or not result.success
-                    else:
-                        assert result.success
-                        receipt={'status':'delivered','message_id':result.message_id,'attempt':delivery['attempt']}
-                        if v['controller_ipc']:await call('gateway.ack',{'id':delivery['id'],'result':receipt})
-                        else:controller.gateway.acknowledge(policy(),delivery['id'],receipt)
+                try:
+                    incoming=relay.next(policy())
+                    if incoming:
+                        from haos.gateway_media_relay import forward,MediaCache
+                        async def local_call(method,params):
+                            if method=='gateway.media.begin':return controller.gateway.media.begin(policy(),params)
+                            if method=='gateway.media.chunk':return controller.gateway.media.chunk(policy(),params)
+                            assert method=='gateway.receive'
+                            return await controller.gateway.receive(policy(),params['connector'],params['envelope'],controller,media=params.get('media'))
+                        received=await forward(policy,'google',incoming['envelope'],incoming['media'],MediaCache(inbox),call if v['controller_ipc'] else local_call)
+                        if incoming['media'] and not v['controller_ipc']:
+                            prepared=controller.gateway.media.for_mission(policy(),received['mission_id'])
+                            assert len(prepared)==1 and prepared[0]['descriptor']['kind']=='image'
+                            assert prepared[0]['data']==__import__('base64').b64decode(v['image'])
+                        relay.admitted(incoming['id'],received['mission_id'])
+                    delivery=await call('gateway.next',{'ready':['google']}) if v['controller_ipc'] else controller.gateway.next_delivery(policy())
+                    if delivery:
+                        metadata=delivery_metadata(delivery,'google_chat')
+                        try:result=await adapter.send(delivery['chat'],delivery['content'],reply_to=delivery['reply_to'],metadata=metadata)
+                        except PermissionError:
+                            if v['scenario']!='sendauth':raise
+                            result=None
+                        if v['scenario']=='sendauth':assert result is None or not result.success
+                        else:
+                            assert result.success
+                            receipt={'status':'delivered','message_id':result.message_id,'attempt':delivery['attempt']}
+                            if v['controller_ipc']:await call('gateway.ack',{'id':delivery['id'],'result':receipt})
+                            else:controller.gateway.acknowledge(policy(),delivery['id'],receipt)
+                except PermissionError:
+                    # Match the production relay loop's revoked-publication
+                    # handling. Unexpected errors under unchanged authority fail.
+                    if publication.read_bytes()==initial:raise
             state={'status':adapter.native_health()['status'],'connected':adapter.is_connected,
                 'parent_records':relay.db.execute('SELECT COUNT(*) FROM inbox').fetchone()[0],
                 'restarted':restarted,'confirmed_outputs':inbox.db.execute("SELECT COUNT(*) FROM google_chat_delivery_groups WHERE state='confirmed'").fetchone()[0]}
@@ -391,16 +422,16 @@ asyncio.run(run())
         result={'type':'MESSAGE','space':{'name':'spaces/room1','spaceType':'DIRECT_MESSAGE'},'message':{
             'name':'spaces/room1/messages/'+mid,'thread':{'name':binding['thread']},'sender':{'type':'HUMAN','name':sender},
             'createTime':now.isoformat().replace('+00:00','Z'),'text':'Create a local plan'}}
-        if scenario in {'media','mediaauth','mediarate','mediarange','medialarge'}:
+        if scenario in {'media','mediaauth','mediarate','mediarange','medialarge','voice','video'}:
             resource=result['message']['name']+'/attachments/resource1'
-            result['message']['attachment']=[{'name':resource,'attachmentDataRef':{'resourceName':resource,'attachmentUploadToken':'opaque-private-upload-reference-fixture'},'contentType':'image/png',
+            result['message']['attachment']=[{'name':resource,'attachmentDataRef':{'resourceName':resource,'attachmentUploadToken':'opaque-private-upload-reference-fixture'},'contentType':media_mime,
                 'downloadUri':'https://foreign-fixture.invalid/never-fetch'}]
         return result
     claims={'iss':'https://accounts.google.com','aud':audience,'sub':'123456789','email':caller,'email_verified':True,
         'iat':int(now.timestamp()),'exp':int(now.timestamp())+3600}
     def token(change=None):return jwt.encode(signer,{**claims,**(change or {})}).decode()
     request={'value':value,'profile':str(profile),'policy':str(publication),'owner':str(owner),'caller_public':caller_public,'api_port':api_server.server_port,'pubsub_port':pubsub_port,'ca':str(ca_file),'scenario':scenario,'image':base64.b64encode(image).decode(),
-        'controller_ipc':controller_ipc,'controller_database':str(directory/'controller-private/missions.sqlite')}
+        'controller_ipc':controller_ipc,'controller_database':str(directory/'controller-private/missions.sqlite'),'backend_url':'ws://127.0.0.1:1/explicit-not-inferred'}
     env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8','PYTHONDONTWRITEBYTECODE':'1'};cases=[]
     for uid,groups in [(0,()),(65533,()),(65534,(0,))]:
         result=subprocess.run([str(runtime/'bin/python'),'-E','-s',str(driver)],input=json.dumps(request).encode(),capture_output=True,
@@ -409,6 +440,27 @@ asyncio.run(run())
     cases.append('actual_root_agent_UID_and_supplementary_root_group_refused_before_optional_token_SDK_or_listener')
     async def exercise():
         from aiohttp import ClientSession,TCPConnector
+        backend_server=None;backend_calls=[]
+        if scenario in {'voice','video'}:
+            import websockets,base64,hashlib
+            async def backend(peer):
+                async for text in peer:
+                    frame=json.loads(text);method=frame['method'];params=frame['params'];backend_calls.append((method,params))
+                    if method=='session.create':result={'session_id':'fixture-session','stored_session_id':'fixture-stored'}
+                    elif method=='file.attach':
+                        assert scenario=='video' and params['data_url']=='data:video/mp4;base64,'+base64.b64encode(image).decode()
+                        result={'attached':True,'uploaded':True,'name':params['name'],'ref_text':'@file:/workspace/'+params['name']}
+                    else:
+                        assert method=='prompt.submit'
+                        if scenario=='voice':assert 'ask not what your country can do for you' in params['text'].lower()
+                        else:assert '@file:/workspace/attachment-' in params['text']
+                        result={'status':'streaming'}
+                    await peer.send(json.dumps({'jsonrpc':'2.0','id':frame['id'],'result':result}))
+                    if method=='prompt.submit':
+                        await peer.send(json.dumps({'method':'event','params':{'type':'message.complete','session_id':'fixture-session',
+                            'seq':1,'payload':{'status':'complete','text':'Local protocol fixture completed; no inference.'}}}))
+            backend_server=await websockets.serve(backend,'127.0.0.1',0)
+            request['backend_url']='ws://127.0.0.1:'+str(backend_server.sockets[0].getsockname()[1])
         control_process=None
         if controller_ipc:
             from haos.gateway_runtime import SOCKET
@@ -425,10 +477,10 @@ from haos.controller import Controller,MAX_FRAME
 from haos.gateway_google_chat import PreparedGoogleChatPolicy
 from haos.store import MissionStore
 v=json.load(sys.stdin)
-assert os.geteuid()==65532 and os.getegid()==65532 and os.getgroups()==[]
+assert os.geteuid()==65532 and os.getegid()==65532 and os.getgroups()==([65534] if v['scenario'] in {'voice','video'} else [])
 async def main():
  store=MissionStore(Path(v['controller_database']))
- controller=Controller(store,'ws://127.0.0.1:1/explicit-not-inferred',{0})
+ controller=Controller(store,v['backend_url'],{0})
  controller.gateway_uids={65534};controller.agent_uid=65533
  controller.gateway_policy=lambda:PreparedGoogleChatPolicy(json.loads(Path(v['policy']).read_text()))
  async def client(reader,writer):
@@ -436,13 +488,31 @@ async def main():
  stop=asyncio.Event();asyncio.get_running_loop().add_signal_handler(signal.SIGTERM,stop.set)
  server=await asyncio.start_unix_server(client,sock=socket.socket(fileno=v['socket_fd']),limit=MAX_FRAME)
  print(json.dumps({'ready':True,'uid':os.geteuid()}),flush=True)
+ async def dispatch_media():
+  while not stop.is_set():
+   row=store.claim()
+   if row:
+    if v['scenario']=='video':
+     from haos.speech_client import thumbnail
+     items=controller.gateway.media.for_mission(controller.gateway_policy(),row['id']);assert len(items)==1
+     def current():controller.gateway.media.check_mission(controller.gateway_policy(),row['id'])
+     preview=await thumbnail(items[0]['data'],current)
+     assert preview['duration_ms']==1000 and preview['width']==320 and preview['height']==180
+     import hashlib
+     Path(v['controller_database']).with_name('video-proof.json').write_text(json.dumps({k:part for k,part in preview.items() if k!='data'}))
+    await controller.execute(row)
+   else:await asyncio.sleep(.05)
+ task=asyncio.create_task(dispatch_media()) if v['scenario'] in {'voice','video'} else None
  try:await stop.wait()
- finally:server.close();await server.wait_closed();store.close()
+ finally:
+  controller.stop.set()
+  if task is not None:task.cancel();await asyncio.gather(task,return_exceptions=True)
+  server.close();await server.wait_closed();store.close()
 asyncio.run(main())
 """);control_driver.chmod(0o644)
             control_process=await asyncio.create_subprocess_exec(str(runtime/'bin/python'),'-E','-s',str(control_driver),
                 stdin=asyncio.subprocess.PIPE,stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.PIPE,
-                pass_fds=(listening.fileno(),),user=65532,group=65532,extra_groups=[],cwd=str(code),env=env,umask=0o077)
+                pass_fds=(listening.fileno(),),user=65532,group=65532,extra_groups=[65534] if scenario in {'voice','video'} else [],cwd=str(code),env=env,umask=0o077)
             control_process.stdin.write(json.dumps({**request,'socket_fd':listening.fileno()}).encode())
             await control_process.stdin.drain();control_process.stdin.close();listening.close()
             ready=await asyncio.wait_for(control_process.stdout.readline(),15)
@@ -537,7 +607,7 @@ asyncio.run(main())
                 pubsub_fault['mode']='hold';deadline=asyncio.get_running_loop().time()+3
                 while not pubsub_fault['held']:
                     assert asyncio.get_running_loop().time()<deadline;await asyncio.sleep(.02)
-                publication.write_text(json.dumps({**policy,'bindings':[]}))
+                publish({**policy,'bindings':[]})
                 await wait_for(lambda state:state.get('status')=='revoked' and state.get('connected') is False)
                 # The server may finish a request already cancelled by the client.
                 # Wait for that handler to drain before offering a new source.
@@ -557,6 +627,64 @@ asyncio.run(main())
                         body=await response.read();assert b'BEGIN PRIVATE KEY' not in body and b'local-google-caller' not in body
                         return response.status,body
                 assert await send()==(200,b'{}')
+                if media_revoke:
+                    deadline=asyncio.get_running_loop().time()+10
+                    while not speech_fixture.children():
+                        assert asyncio.get_running_loop().time()<deadline,'actual local STT worker must start before withdrawal'
+                        await asyncio.sleep(.01)
+                    workers=speech_fixture.children();assert workers
+                    publish({**policy,'bindings':[]})
+                    deadline=asyncio.get_running_loop().time()+5
+                    while True:
+                        state=json.loads((profile/'profile-status.json').read_text())
+                        if not speech_fixture.children() and state['status']=='revoked' and not state['connected']:break
+                        assert asyncio.get_running_loop().time()<deadline,(state,speech_fixture.children(),[method for method,_ in backend_calls],child.returncode)
+                        await asyncio.sleep(.02)
+                    assert speech_fixture.process.poll() is None
+                    for pid in workers:
+                        try:os.kill(pid,0)
+                        except ProcessLookupError:pass
+                        else:raise AssertionError('withdrawn Google voice left local native worker alive')
+                    assert [method for method,_ in backend_calls]==['session.create']
+                    with sqlite3.connect(request['controller_database']) as db:
+                        assert db.execute('SELECT COUNT(*) FROM gateway_media_transcripts').fetchone()[0]==0
+                        assert db.execute('SELECT COUNT(*) FROM missions').fetchone()[0]==1
+                        assert db.execute('SELECT state FROM missions').fetchone()[0]!='completed'
+                    with sqlite3.connect(original_path) as db:assert db.execute('SELECT COUNT(*) FROM google_chat_originals').fetchone()[0]==1
+                    cases.append('actual_Root_Google_voice_grant_withdrawal_during_native_STT_cancels_speech_socket_and_joins_real_worker_without_transcript_or_prompt_or_fabricated_completion_while_preserving_original')
+                    return
+                if scenario in {'voice','video'}:
+                    deadline=asyncio.get_running_loop().time()+50
+                    while True:
+                        state=json.loads((profile/'profile-status.json').read_text())
+                        with sqlite3.connect(request['controller_database']) as db:
+                            missions=db.execute('SELECT id,state,error FROM missions').fetchall()
+                        if len(missions)==1 and missions[0][1]=='completed' and any('Local protocol fixture completed' in item['text'] for item in api_payloads):break
+                        assert not missions or missions[0][1] not in {'blocked','failed'},missions
+                        assert child.returncode is None and asyncio.get_running_loop().time()<deadline,(state,missions)
+                        await asyncio.sleep(.05)
+                    downloads=api_calls.count('native-media-download');assert downloads==(len(image)+524287)//524288
+                    assert await send()==(200,b'{}') and await send(event('unknown','users/456'))==(200,b'{}')
+                    await asyncio.sleep(.3);assert api_calls.count('native-media-download')==downloads
+                    assert [method for method,_ in backend_calls].count('prompt.submit')==1
+                    with sqlite3.connect(request['controller_database']) as db:
+                        assert db.execute('SELECT COUNT(*) FROM missions').fetchone()[0]==1
+                        pieces=db.execute('SELECT data FROM gateway_media_chunks ORDER BY offset').fetchall()
+                        assert b''.join(row[0] for row in pieces)==image
+                        if scenario=='voice':
+                            receipt=json.loads(db.execute('SELECT receipt FROM gateway_media_transcripts').fetchone()[0])
+                            assert receipt['source_sha256']==hashlib.sha256(image).hexdigest() and receipt['samples']==176000
+                            assert 'ask not what your country can do for you' in receipt['transcript'].lower()
+                            assert [method for method,_ in backend_calls]==['session.create','prompt.submit']
+                        else:
+                            preview=json.loads(Path(request['controller_database']).with_name('video-proof.json').read_text())
+                            assert preview['source_sha256']==hashlib.sha256(image).hexdigest() and preview['duration_ms']==1000
+                            assert [method for method,_ in backend_calls]==['session.create','file.attach','prompt.submit']
+                    cases.extend([
+                        'actual_Google_SDK_source_bound_chunked_media_TLS_download_native_codec_and_kernel_Unix_IPC_preserve_exact_'+scenario+'_bytes',
+                        'actual_separate_controller_execute_and_speech_UID_'+('pinned_Whisper_local_transcription_feed_only_source_bound_transcript_to_protocol_fixture' if scenario=='voice' else 'PyAV_thumbnail_and_original_video_attachment_to_protocol_fixture'),
+                        'actual_media_replay_and_unknown_sender_never_repeat_download_local_processing_or_protocol_prompt'])
+                    return
                 if scenario in {'mediarange','medialarge'}:
                     deadline=asyncio.get_running_loop().time()+5
                     while True:
@@ -656,7 +784,7 @@ asyncio.run(main())
                 cases.append('actual_private_profile_connect_runs_native_service_account_RSA_refresh_and_verified_local_TLS_own_bot_membership_check_before_listening_then_native_replay_admits_two_unique_parent_records')
                 cases.append('actual_private_profile_receive_replay_real_controller_component_event_context_and_native_SDK_TLS_reply_form_one_loop_with_FULL_prewrite_custody_and_two_unique_confirmed_outputs')
                 cases.append('actual_native_profile_disconnect_and_reconnect_close_and_rebind_TLS_with_the_same_private_lease_and_journals_and_fresh_real_SDK_account_auth_checks')
-                publication.write_text(json.dumps({**policy,'bindings':[]}));deadline=asyncio.get_running_loop().time()+5
+                publish({**policy,'bindings':[]});deadline=asyncio.get_running_loop().time()+5
                 while True:
                     state=json.loads((profile/'profile-status.json').read_text())
                     if state['status']=='revoked' and state['connected'] is False:break
@@ -675,18 +803,24 @@ asyncio.run(main())
                 _,errors=await asyncio.wait_for(control_process.communicate(),10)
                 assert control_process.returncode==0,errors.decode()[-1500:]
                 assert Path(request['controller_database']).stat().st_uid==65532 and Path(request['controller_database']).stat().st_mode&0o077==0
+            if backend_server is not None:backend_server.close();await backend_server.wait_closed()
 
     try:asyncio.run(exercise())
     finally:
         api_server.shutdown();api_server.server_close();api_thread.join(timeout=2)
         if pubsub_server is not None:pubsub_server.stop(0).wait(timeout=5)
+        if speech_fixture is not None:speech_fixture.close()
     print(json.dumps({'passed':len(cases),'cases':cases,'actual_gateway_UID_private_profile_native_lifecycle_RSA_OAuth_TLS_listener_and_FULL_SQLite':True,
         'Google_certificate_endpoint_and_OAuth_service_account_are_explicit_fixtures':True,
-        'actual_native_controller_component_outbox_and_TLS_replies':scenario in {'active','sendauth','media'} or scenario.startswith('pubsub'),
+        'actual_native_controller_component_outbox_and_TLS_replies':scenario in {'active','sendauth','media','voice','video'} and not media_revoke or scenario.startswith('pubsub'),
         'actual_full_PubSub_profile_TLS_gRPC':scenario.startswith('pubsub'),
         'actual_image_SDK_TLS_native_codec_retention_and_controller_component_transfer':scenario=='media',
         'actual_separate_controller_UID_kernel_Unix_IPC':controller_ipc,
-        'local_ASR_video_decode_GUI_live_Google_account_production_daemon_or_public_activation':False},indent=2))
+        'actual_local_Google_voice_ASR_controller_execute':scenario=='voice' and not media_revoke,
+        'actual_local_Google_voice_ASR_revocation':media_revoke,
+        'actual_local_Google_video_thumbnail_and_controller_attach':scenario=='video',
+        'Hermes_WebSocket_service_is_explicit_protocol_fixture_not_inference':scenario in {'voice','video'},
+        'GUI_live_Google_account_production_daemon_or_public_activation':False},indent=2))
 
 
 if __name__=='__main__':main()

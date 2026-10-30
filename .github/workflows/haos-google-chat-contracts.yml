@@ -87,6 +87,25 @@ jobs:
               python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
               python3 /probe.py > "$RUNNER_TEMP/google-chat-contracts/controller-ipc-$SCENE.json"
           done
+      - name: Actual Google voice video and mid-transcription withdrawal across private processes
+        run: |
+          set -euo pipefail
+          SDK_SITE="$PWD/upstream/hermes-agent/.venv/lib/python3.11/site-packages"
+          upstream/hermes-agent/.venv/bin/python linux/haos/runtime/fetch_speech_fixture.py linux/haos "$RUNNER_TEMP/google-chat-speech"
+          for SCENE in voice video revoke; do
+            KIND="$SCENE"
+            REVOKE=0
+            if test "$SCENE" = revoke; then KIND=voice; REVOKE=1; fi
+            docker run --rm --network none --security-opt no-new-privileges --pids-limit 128 --memory 1g \
+              -v "$PWD:/repo:ro" -v "$SDK_SITE:/deps:ro" \
+              -v "$RUNNER_TEMP/google-chat-speech/reference.flac:/public-input/reference.flac:ro" \
+              -v "$RUNNER_TEMP/google-chat-speech/model:/public-model:ro" \
+              -v "$PWD/linux/haos/probes/probe_google_chat_profile_process.py:/probe.py:ro" \
+              -e HAOS_DISPOSABLE_GOOGLE_CHAT_PROFILE_PROCESS=1 -e HAOS_GOOGLE_CHAT_CONTROLLER_IPC=1 \
+              -e "HAOS_GOOGLE_CHAT_PROFILE_ACCOUNT=$KIND" -e "HAOS_GOOGLE_CHAT_MEDIA_REVOKE=$REVOKE" \
+              python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+              python3 /probe.py > "$RUNNER_TEMP/google-chat-contracts/local-media-$SCENE.json"
+          done
       - name: Actual private UID OAuth enrollment refresh revocation and rejected-credential disposal
         run: |
           set -euo pipefail
