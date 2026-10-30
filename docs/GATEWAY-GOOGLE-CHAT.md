@@ -239,3 +239,40 @@ Source-bound incoming-media evidence:
 [incoming media and existing receive/text regression](evidence/2026-10-30/google-chat-private-input-media-validation.json).
 Prepared Owner recovery evidence remains separately pinned to its own source:
 [Owner handoff and Tk component validation](evidence/2026-10-30/google-chat-private-owner-validation.json).
+
+## Prepared private user OAuth enrollment
+
+Native outbound attachments need the user's Google OAuth delegation. The
+prepared enrollment uses the actual frozen Google Flow SDK and pinned Hermes
+OAuth scope/redirect contract, with independent HAOS private SQLite PKCE state,
+nonce, timed grant and stable Google user resource checks. OpenID is requested
+alongside the native `chat.messages.create` scope so a signed stable subject can
+be verified instead of trusting a mutable email. Desktop client JSON is bound
+to the configured project and fixed Google/loopback endpoints. The callback
+must include its original state; a bare code cannot authorize an exchange.
+
+A FULL exchange intent and Owner actor/note hash commit before the first token
+request. A begun exchange cannot silently replay after interruption/reopen.
+The per-session SDK transport has one bounded token POST, no redirects, ambient
+credentials or retry hooks. Actual Google JWT signature/issuer/audience/time
+verification precedes the additional exact subject, client and nonce checks.
+The SDK result is an opaque private grant, not serialized claim authority.
+Successful user credentials and acceptance audit commit together under the
+private gateway UID; the completed pending record compacts its PKCE/client
+secrets while keeping metadata/audit. Other client versions stop being selected
+but remain private for explicit remote revocation. Payloads never become an
+Agent or public Owner result.
+
+This is a private enrollment component, not complete user OAuth integration.
+Refresh, remote/local revocation, cleanup/quarantine of credentials from rejected
+or interrupted exchanges, authenticated Owner handoff/GUI and native file
+outputs remain open. In particular, refusal here does not claim revocation of
+an authorization-server grant. The dedicated TLS fixture verifies the actual
+SDK/PKCE/RSA and SQLite boundary, with schema-only service-account data for user
+OAuth scope and explicit local Google token/certificate substitutes; it proves
+neither live Google account permissions nor external delivery. Public count:
+15/22.
+
+Source-bound enrollment evidence:
+[private PKCE/SDK enrollment validation](evidence/2026-10-30/google-chat-private-oauth-enrollment-validation.json).
+Pending-secret compaction does not assert erasure of WAL, backups or other copies.
