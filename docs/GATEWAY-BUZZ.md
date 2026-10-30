@@ -308,3 +308,22 @@ separately for both A2A and Buzz. No installed controller-to-native-file flow,
 GUI/account setup, external relay delivery, provider inference, release or
 hardware acceptance is inferred from these fixtures. See
 [evidence/2026-10-30/buzz-native-output-validation.json](evidence/2026-10-30/buzz-native-output-validation.json).
+
+### Offline upload decisions (private component)
+
+Unresolved uploads now have finite no-network inspection and recovery functions.
+An exact snapshot, current account, unchanged outbound/read grant, explicit owner
+identity and review-note hash are required before allowing a retry. Decisions
+are audited and idempotent, advance the inspection snapshot, and allow at most
+two additional upload operations. A previously consumed decision cannot release
+another operation. Existing signed reply custody prohibits replacing its upload.
+Payload disposal requires withdrawal/change of the original grant and retains
+metadata, audit and tombstones; backup/WAL erasure is not claimed.
+
+The installed-UID component probe now passes 43 cases, including a real SQL
+failure after native upload and a new process consuming the exact approved
+retry. Both runtime regressions pass 2,612 tests with two existing skips and
+172 root/kernel cases pass. These component decisions are not yet connected to
+an authenticated root owner worker, CLI or GUI; the probe's owner request and
+root export RPC remain explicitly identified seams. See
+[evidence/2026-10-30/buzz-upload-recovery-validation.json](evidence/2026-10-30/buzz-upload-recovery-validation.json).

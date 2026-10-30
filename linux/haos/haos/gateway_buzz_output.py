@@ -27,7 +27,7 @@ class Output:
             raise PermissionError('exact current private Buzz output/read and independent media approval required')
         return binding
 
-    def retained(self,identity,delivery,proof=None):
+    def retained(self,identity,delivery,proof=None,*,retry=False):
         binding=self.current(delivery);row=self.db.execute('SELECT * FROM buzz_output_uploads WHERE id=?',(identity,)).fetchone()
         if row is None:return None
         if (row['delivery_id']!=delivery['id'] or row['binding_digest']!=digest(binding)
@@ -35,6 +35,12 @@ class Output:
                 or not isinstance(row['source'],bytes) or not 1<=len(row['source'])<=MAX_BYTES
                 or hashlib.sha256(row['source']).hexdigest()!=row['source_sha256']):
             raise Conflict('Buzz output source changed or was purged; inspected recovery required')
+        if retry and row['state']=='retry-approved' and not row['descriptor'] and not row['stored']:
+            if not self.db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='buzz_upload_owner_events'").fetchone():
+                raise Conflict('Buzz upload retry has no retained inspected owner decision')
+            approvals=self.db.execute("SELECT COUNT(*) FROM buzz_upload_owner_events WHERE id=? AND action='retry-upload'",(identity,)).fetchone()[0]
+            if not 1<=approvals<=2:raise Conflict('Buzz upload retry has no bounded inspected owner history')
+            return None
         if row['state']!='ready':raise Conflict('Buzz upload has an unresolved intent; no automatic upload or publication')
         from .gateway_line_ingress import _object
         from .gateway_dingtalk_admission import finite
@@ -88,7 +94,7 @@ class Output:
                     or any(not isinstance(offer[key],str) or not HEX.fullmatch(offer[key]) for key in ['id','sha256'])):
                 raise Conflict('bounded root Buzz output snapshot required')
             identity=digest([delivery['id'],offer['id']]);proof=digest([delivery['id'],offer,binding,digest(self.adapter._haos_buzz_value)])
-            if self.retained(identity,delivery,proof) is not None:result['items'].append(identity);continue
+            if self.retained(identity,delivery,proof,retry=True) is not None:result['items'].append(identity);continue
             data=bytearray()
             while len(data)<offer['size']:
                 self.current(delivery)
@@ -111,8 +117,14 @@ class Output:
             if count>=128 or used+2*len(data)>48*1024*1024:raise Conflict('Buzz output custody full; owner recovery required')
             # Commit before native upload. A restart can never mistake an
             # uncertain upload for a new artifact or authorize publication.
-            self.db.execute('INSERT INTO buzz_output_uploads VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',
-                (identity,delivery['id'],proof,digest(binding),digest(self.adapter._haos_buzz_value),name,offer['sha256'],'uploading','',data,b'',time.time()))
+            previous=self.db.execute('SELECT state,source FROM buzz_output_uploads WHERE id=?',(identity,)).fetchone()
+            if previous is None:
+                self.db.execute('INSERT INTO buzz_output_uploads VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',
+                    (identity,delivery['id'],proof,digest(binding),digest(self.adapter._haos_buzz_value),name,offer['sha256'],'uploading','',data,b'',time.time()))
+            else:
+                if previous['state']!='retry-approved' or previous['source']!=data:raise Conflict('Buzz inspected upload retry changed original bytes or state')
+                changed=self.db.execute("UPDATE buzz_output_uploads SET state='uploading' WHERE id=? AND state='retry-approved'",(identity,)).rowcount
+                if changed!=1:raise Conflict('Buzz upload retry approval was already consumed')
             uploaded=await upload(self.adapter._haos_buzz_value,data,home=self.adapter._haos_buzz_home,
                 current=lambda:self.current(delivery),redactor=self.adapter._haos_native.inbox.redactor)
             self.current(delivery)

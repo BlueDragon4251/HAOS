@@ -150,7 +150,7 @@ async def exercise():
             from haos.gateway_buzz_output import Output
             import hashlib,base64,sqlite3
             name=sys.argv[1];data=b'%PDF-1.7\\nPrivate local fixture output\\n%%EOF\\n'
-            case='fault' if name in {'output-fault','output-fault-reopen'} else 'normal'
+            case='fault' if name in {'output-fault','output-fault-reopen','output-owner-retry'} else 'normal'
             binding=next(iter(current().bindings.values()))
             adapter._haos_native=SimpleNamespace(inbox=inbox,policy=current,connector='buzz')
             adapter._haos_buzz_value=value;adapter._haos_buzz_home=base;adapter._haos_buzz_check=current
@@ -175,6 +175,16 @@ async def exercise():
             if name=='output-damage':output.db.execute("UPDATE buzz_output_uploads SET stored=x'00' WHERE delivery_id=?",(delivery['id'],))
             if name=='output-fault':
                 output.db.execute("CREATE TRIGGER fail_upload_receipt BEFORE UPDATE ON buzz_output_uploads WHEN NEW.state='ready' BEGIN SELECT RAISE(ABORT,'fixture upload custody failure'); END")
+            if name=='output-owner-retry':
+                from haos.gateway_buzz_output_recovery import inventory,decide
+                view=[row for row in inventory(inbox,current())['outputs'] if row['delivery_id']==delivery['id']][0]
+                request={'id':view['id'],'action':'retry-upload','snapshot_sha256':view['snapshot_sha256'],
+                    'owner_uid':1000,'note_sha256':'b'*64,'confirmed':True}
+                try:decide(inbox,current(),value,{**request,'snapshot_sha256':'0'*64})
+                except Conflict:pass
+                else:raise AssertionError('stale fixture owner upload decision was accepted')
+                receipt=decide(inbox,current(),value,request)
+                assert decide(inbox,current(),value,request)==receipt and receipt['network_requested'] is False
             try:result=await output.prepare(delivery,root_export)
             except sqlite3.IntegrityError:
                 assert name=='output-fault'
@@ -184,7 +194,7 @@ async def exercise():
                 print(json.dumps({'custody_refused':True}),flush=True);return
             assert result['text']=='Generated.' and len(result['items'])==1
             parts=output.resolve(delivery,result['items']);assert parts[0]['descriptor']['sha256']==hashlib.sha256(data).hexdigest()
-            assert bool(chunks)==(name=='output-first')
+            assert bool(chunks)==(name in {'output-first','output-owner-retry'})
             print(json.dumps({'root_snapshot_fixture':True,'native_verified_upload':True,'reused':not bool(chunks)}),flush=True);return
         if sys.argv[1].startswith('upload-'):
             from haos.gateway_buzz_upload import upload,UploadFailed
@@ -876,12 +886,14 @@ except PermissionError as error:
                 for name,expected,attempts in [('output-first',{'root_snapshot_fixture':True,'native_verified_upload':True,'reused':False},1),
                         ('output-reopen',{'root_snapshot_fixture':True,'native_verified_upload':True,'reused':True},0),
                         ('output-damage',{'custody_refused':True},0),('output-fault',{'intent_retained':True},1),
-                        ('output-fault-reopen',{'custody_refused':True},0)]:
+                        ('output-fault-reopen',{'custody_refused':True},0),
+                        ('output-owner-retry',{'root_snapshot_fixture':True,'native_verified_upload':True,'reused':False},1)]:
                     mode['name']=name;before=len(uploads);read_before=len(media_gets);process=spawn(name)
                     assert await line(process)==expected;await done(process)
                     assert len(uploads)==before+attempts and len(media_gets)==read_before+attempts
                 cases.append('actual_UID_root_snapshot_RPC_component_fixture_retains_source_and_native_upload_bytes_then_reuses_exact_SQL_descriptor_after_process_reopen_without_network_or_new_artifact_read')
                 cases.append('actual_SQL_failure_after_successful_upload_retains_unresolved_intent_and_new_process_refuses_automatic_reupload_while_damaged_ready_custody_never_refetches_or_restores_blob')
+                cases.append('fixture_owner_upload_decision_rejects_stale_inspection_and_is_idempotent_then_new_gateway_UID_process_consumes_exact_one_retry_with_original_root_snapshot_bytes_and_actual_native_Blossom_upload')
             finally:await public_runner.cleanup()
         finally:
             for connection in active:await connection.close()

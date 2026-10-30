@@ -70,6 +70,22 @@ def credentials(value):
 def scope(value):return 'buzz:'+digest([value['relay_url'],value['public_key']])
 
 
+def authority(connector,value,expected=None):
+    from pathlib import Path
+    from .gateway_publication import pending
+    from .sandbox import trusted_json
+    value=credentials(value);config=Path('/etc/haos')
+    if pending(config):raise PermissionError('Buzz owner publication requires recovery')
+    raw=trusted_json(config/'gateways.json');policy=PreparedBuzzPolicy(raw)
+    if policy.connectors.get(connector,{}).get('platform')!='buzz':raise PermissionError('configured private Buzz connector required')
+    if any(row['connector']==connector and (row['scope']!=scope(value) or row['chat'] not in value['channels']
+            or row['sender']==value['public_key']) for row in policy.bindings.values()):
+        raise PermissionError('Buzz grant differs from exact saved relay identity or channel')
+    result=digest(raw)
+    if pending(config) or expected is not None and expected!=result:raise PermissionError('Buzz owner publication changed')
+    return result
+
+
 def resource_origin(value,url):
     """No credential-bearing GET beyond the native relay's media namespace."""
     if (not isinstance(url,str) or not 1<=len(url)<=4096 or any(ord(c)<33 or ord(c)>126 for c in url) or '\\' in url):
