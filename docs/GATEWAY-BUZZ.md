@@ -327,3 +327,36 @@ retry. Both runtime regressions pass 2,612 tests with two existing skips and
 an authenticated root owner worker, CLI or GUI; the probe's owner request and
 root export RPC remain explicitly identified seams. See
 [evidence/2026-10-30/buzz-upload-recovery-validation.json](evidence/2026-10-30/buzz-upload-recovery-validation.json).
+
+### Actual controller and authenticated owner handoff (private)
+
+The installed-code process fixture now connects the actual native NIP-42
+receiver, private journals and parent relay to the actual root Controller Unix
+socket. SO_PEERCRED denies a foreign agent UID even with socket-group access;
+a changed grant digest is independently refused. The real mission queue, event
+context and outbox produce native signed replies. Completed files use actual
+manifest/begin/chunk RPCs, the authenticated bounded HTTP artifact reader,
+sealed Blossom upload, native imeta and durable root acknowledgement. Restart
+creates no duplicate mission, file read, upload or response. The agent artifact
+HTTP endpoint is a fixture, and no model inference is performed.
+
+A fixed root-owned private interpreter now runs no-send account, output and
+reply inspection under the real gateway UID. The worker requires its actual
+root parent, denies privilege gains, bounds resources and refuses other runtime
+UIDs before optional SDK imports. Four root owner backend actions reject a
+foreign UID. Invalid nsec checksums and a mismatched public identity fail before
+any HTTP query. The account check verifies native identity and selected readonly
+queries; it never grants a sender or claims external delivery/membership.
+
+Offline output disposal goes through this authenticated UID boundary, denies
+an active grant, and retains an idempotent audit/tombstone after real publication
+withdrawal. The fixture stages the journal with SQLite backup under its actual
+UID so WAL commits are included. Only the service-stop/systemd boundary is
+substituted in this disposable non-systemd namespace; actual UID, root-parent,
+installed files, CLI/TLS, journals and owner audit remain real.
+
+Fifty-three native process cases and 2,629 tests per runtime pass, with the same
+two existing skips. The separate 172 root/kernel checks pass. GUI/CLI wiring,
+public factory activation, authentication-retry UI, complete owner recovery
+coverage and build/CI packaging remain unfinished; public progress stays 14/22.
+See [evidence/2026-10-30/buzz-owner-handoff-validation.json](evidence/2026-10-30/buzz-owner-handoff-validation.json).

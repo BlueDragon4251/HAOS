@@ -146,6 +146,50 @@ adapter.send_reaction=no_reaction
 transport=Transport(value,current,capture);adapter._open_websocket=transport.open
 async def exercise():
     try:
+        if sys.argv[1]=='controller':
+            from haos.gateway_media_relay import MediaCache,forward
+            from haos.gateway_runtime import adapter_envelope,call,delivery_metadata
+            from haos.gateway_delivery import delivery_result
+            local=NativeInbox(base/'controller-native.db',redactor);parent=RelayInbox(base/'controller-relay.db',redactor)
+            profiles=base/'controller-profiles';profiles.mkdir(mode=0o700,exist_ok=True)
+            profile=build_profile(value,parent=profiles,connector='buzz',policy=current,inbox=local);cache=MediaCache(local)
+            def admit(event):
+                assert event.raw_message is None
+                return bool(parent.admit(current(),'buzz',adapter_envelope(event,'buzz')))
+            profile.set_durable_message_handler(admit);profile.set_message_handler(admit)
+            try:
+                assert await profile.connect() and profile.is_connected
+                async with asyncio.timeout(8):
+                    while parent.db.execute('SELECT COUNT(*) FROM inbox').fetchone()[0]!=1:await asyncio.sleep(.02)
+                print(json.dumps({'controller_native_ready':True}),flush=True)
+                while True:
+                    command=json.loads(await asyncio.to_thread(sys.stdin.readline))
+                    if command['method']=='close':break
+                    if command['method'] in {'forward','wrong-binding'}:
+                        row=dict(parent.db.execute('SELECT * FROM inbox').fetchone());envelope=json.loads(row['envelope'])
+                        if command['method']=='wrong-binding':
+                            try:await call('gateway.receive',{'connector':'buzz','envelope':envelope,
+                                'binding':{'binding_id':row['binding_id'],'binding_digest':'0'*64}})
+                            except PermissionError:result={'root_denied':True}
+                            else:raise AssertionError('root accepted changed Buzz grant epoch')
+                        else:
+                            result=await forward(current,'buzz',envelope,[],cache,call)
+                            parent.admitted(row['id'],result['mission_id'])
+                    elif command['method']=='pump':
+                        sent=0
+                        while (delivery:=await call('gateway.next',{'ready':['buzz']})) is not None:
+                            metadata=delivery_metadata(delivery,'buzz')
+                            output=await profile._haos_buzz_output.prepare(delivery,call)
+                            if output is not None:metadata['haos_output']=output
+                            receipt=await profile.send(delivery['chat'],delivery['content'],reply_to=delivery['reply_to'],metadata=metadata)
+                            result=delivery_result(receipt,redactor)
+                            assert result['status']=='delivered',result
+                            await call('gateway.ack',{'id':delivery['id'],'result':{'attempt':delivery['attempt'],**result}});sent+=1
+                        result={'native_root_replies':sent}
+                    else:raise AssertionError('unknown controller fixture command')
+                    print(json.dumps(result),flush=True)
+            finally:await profile.close_profile();local.close();parent.close()
+            return
         if sys.argv[1].startswith('output-'):
             from haos.gateway_buzz_output import Output
             import hashlib,base64,sqlite3
@@ -590,7 +634,7 @@ except PermissionError as error:
     cases=['actual_root_agent_UID_and_gateway_with_supplementary_root_group_are_refused_before_optional_native_SDK_import_or_credential_parsing_in_private_profile_factory']
     async def exercise():
         from aiohttp import web
-        mode={'name':'receive'};auths=[];subscriptions=[];escapes=[];active=[];queries=[];query_auth=[];outgoing=[];write_auth=[];assets={};media_gets=[];public_gets=[];uploads=[]
+        mode={'name':'receive'};auths=[];subscriptions=[];escapes=[];active=[];queries=[];query_auth=[];outgoing=[];write_auth=[];assets={};media_gets=[];public_gets=[];uploads=[];controller_store=None
         def verified(event):
             result=subprocess.run([str(target/'haos-buzz-verify')],input=json.dumps(event),text=True,capture_output=True,timeout=5)
             assert result.returncode==0 and json.loads(result.stdout)['valid'] is True
@@ -643,8 +687,21 @@ except PermissionError as error:
                         assert original['content']=='Private local result file\n[result-0.pdf]('+url+')'
                         assert [tag for tag in original['tags'] if tag[0]=='imeta']==[['imeta','url '+url,'m application/pdf','x '+sha,
                             'size '+str(len(assets['/media/'+sha+'.pdf'])),'filename result-0.pdf']]
-                    else:assert original['content']=='Private local fixture '+expected
-                    if mode['name'].startswith('outbox'):
+                    elif mode['name']!='controller':assert original['content']=='Private local fixture '+expected
+                    if mode['name']=='controller':
+                        with sqlite3.connect('file:'+str(private/'controller-native.db')+'?mode=ro',uri=True) as check:
+                            intent=check.execute("SELECT delivery_id,signed_raw,target FROM buzz_delivery_intents WHERE event_id=? AND state='writing'",(original['id'],)).fetchone()
+                            assert intent is not None and intent[1]==body
+                        row=controller_store.db.execute('SELECT content,state FROM gateway_outbox WHERE id=?',(intent[0],)).fetchone()
+                        assert row is not None and row['state']=='sending'
+                        if any(tag[0]=='imeta' for tag in original['tags']):
+                            selected=json.loads(intent[2]);assert len(selected['attachments'])==1
+                            part=selected['attachments'][0];desc=part['descriptor']
+                            assert original['content']==selected['content']+'\n['+part['name']+']('+desc['url']+')'
+                            assert 'MEDIA:./result.pdf' not in original['content']
+                            assert controller_store.db.execute('SELECT data FROM gateway_output_files WHERE sha256=?',(desc['sha256'],)).fetchone()[0]==assets['/media/'+desc['sha256']+'.pdf']
+                        else:assert row['content']==original['content']
+                    elif mode['name'].startswith('outbox'):
                         with sqlite3.connect('file:'+str(private/'outbox-native.db')+'?mode=ro',uri=True) as check:
                             assert check.execute("SELECT signed_raw FROM buzz_delivery_intents WHERE event_id=? AND state='writing'",(original['id'],)).fetchone()[0]==body
                     else:
@@ -656,6 +713,9 @@ except PermissionError as error:
                 selection=json.loads(body);queries.append(selection);query_auth.append(auth['id'])
                 assert isinstance(selection,list) and len(selection)==1
                 if selection[0].get('ids')==[event['id']]:return web.json_response([event])
+                if mode['name']=='controller':
+                    selected=json.loads(fixture.read_text())['controller-source']
+                    if selection[0].get('ids')==[selected['id']]:return web.json_response([selected])
                 if mode['name'] in {'reader-auth','profile-auth'}:return web.json_response({'error':'not channel members '+scalar},status=401)
                 if mode['name']=='reader-rate':return web.json_response({'error':'rate limited fixture'},status=429)
                 if mode['name']=='reader-reflect':return web.json_response([signed(scalar,json.dumps({'display_name':scalar}),0)])
@@ -687,6 +747,9 @@ except PermissionError as error:
             assert first[0]=='REQ' and first[2]['#h']==[channel] and second[2]['#p']==[public]
             if mode['name'] in {'receive','profile'} or mode['name'].startswith('outbox'):
                 await socket.send_json(['EVENT',first[1],unknown]);await socket.send_json(['EVENT',first[1],event]);await socket.send_json(['EVENT',first[1],event])
+            if mode['name']=='controller':
+                selected=json.loads(fixture.read_text())['controller-source']
+                await socket.send_json(['EVENT',first[1],unknown]);await socket.send_json(['EVENT',first[1],selected]);await socket.send_json(['EVENT',first[1],selected])
             async for message in socket:
                 if message.type==web.WSMsgType.TEXT:subscriptions.append(json.loads(message.data))
             return socket
@@ -894,6 +957,171 @@ except PermissionError as error:
                 cases.append('actual_UID_root_snapshot_RPC_component_fixture_retains_source_and_native_upload_bytes_then_reuses_exact_SQL_descriptor_after_process_reopen_without_network_or_new_artifact_read')
                 cases.append('actual_SQL_failure_after_successful_upload_retains_unresolved_intent_and_new_process_refuses_automatic_reupload_while_damaged_ready_custody_never_refetches_or_restores_blob')
                 cases.append('fixture_owner_upload_decision_rejects_stale_inspection_and_is_idempotent_then_new_gateway_UID_process_consumes_exact_one_retry_with_original_root_snapshot_bytes_and_actual_native_Blossom_upload')
+                from haos.controller import Controller,MAX_FRAME
+                from haos.store import MissionStore
+                from haos.gateway_runtime import SOCKET
+                from haos.gateway_buzz import PreparedBuzzPolicy
+                from haos.sandbox import trusted_json
+                from contextlib import redirect_stdout
+                root_grant={**grant,'allow_outbound_media':True,'generation':'e'*64,'since':(int(time.time())-5)*1000}
+                publish({**config,'bindings':[root_grant],'publication':'e'*64})
+                inputs=json.loads(fixture.read_text());inputs['controller-source']=signed(peer_scalar,'Local actual root mission')
+                fixture.write_text(json.dumps(inputs));fixture.chmod(0o644)
+                controller_store=MissionStore(root/'root-missions.db')
+                controller=Controller(controller_store,'ws://127.0.0.1:1/fixture-not-inferred',{0})
+                controller.gateway_uids={65534};controller.agent_uid=65533
+                controller.gateway_policy=lambda:PreparedBuzzPolicy(trusted_json(etc/'gateways.json'))
+                control=Path(SOCKET);control.parent.mkdir(mode=0o750);os.chown(control.parent,0,65534)
+                async def root_client(reader,writer):
+                    with redirect_stdout(sys.stderr):await controller.client(reader,writer,gateway=True)
+                root_server=await asyncio.start_unix_server(root_client,path=SOCKET,limit=MAX_FRAME)
+                control.chmod(0o660);os.chown(control,0,65534)
+                agent_code='''import asyncio,json,sys
+async def exercise():
+    reader,writer=await asyncio.open_unix_connection(sys.argv[1])
+    try:
+        assert json.loads(await reader.readline())=={'ok':False,'error':'control peer is not authorized'}
+    finally:writer.close();await writer.wait_closed()
+asyncio.run(exercise())
+'''
+                agent=subprocess.Popen([sys.executable,'-c',agent_code,SOCKET],user=65533,group=65534,extra_groups=[],
+                    stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.PIPE,env={'PATH':'/usr/bin:/bin'})
+                agent_out,agent_err=await asyncio.wait_for(asyncio.to_thread(agent.communicate),5)
+                assert agent.returncode==0 and not agent_out and not agent_err
+                artifact_token='private-fixture-buzz-root-file-capability';file_reads=[]
+                file_bytes=b'%PDF-1.7\nRoot controller verified output\n%%EOF\n'
+                async def artifact_read(request):
+                    assert request.headers.get('Authorization')=='Bearer '+artifact_token
+                    assert dict(request.query)=={'session_id':'stored-buzz-output','path':'./result.pdf'}
+                    assert not request.headers.get('Cookie')
+                    file_reads.append(dict(request.query))
+                    return web.json_response({'dataUrl':'data:application/pdf;base64,'+base64.b64encode(file_bytes).decode()})
+                artifact_app=web.Application();artifact_app.router.add_get('/api/fs/read-data-url',artifact_read)
+                artifact_runner=web.AppRunner(artifact_app,access_log=None);await artifact_runner.setup()
+                with socket.socket() as reserved:reserved.bind(('127.0.0.1',0));artifact_port=reserved.getsockname()[1]
+                await web.TCPSite(artifact_runner,'127.0.0.1',artifact_port).start()
+                controller.url='ws://127.0.0.1:'+str(artifact_port)+'/api/ws?token='+artifact_token
+                controller_store.redactor=__import__('haos.redaction',fromlist=['Redactor']).Redactor([scalar,artifact_token])
+                mode['name']='controller';process=spawn('controller')
+                async def command(value):
+                    process.stdin.write(json.dumps(value)+'\n');process.stdin.flush();return await line(process)
+                try:
+                    assert await line(process)=={'controller_native_ready':True}
+                    assert await command({'method':'wrong-binding'})=={'root_denied':True}
+                    first=await command({'method':'forward'});second=await command({'method':'forward'})
+                    assert first==second and len(controller_store.list())==1
+                    mid=first['mission_id'];assert controller_store.get(mid)['goal']=='Local actual root mission'
+                    receipt=await command({'method':'pump'});assert receipt['native_root_replies']>=1
+                    assert controller_store.claim()['id']==mid
+                    controller_store.session(mid,'live-buzz-output','stored-buzz-output')
+                    controller_store.settle(mid,'completed',result='Actual root fixture result; no inference claimed.\nMEDIA:./result.pdf')
+                    upload_before=len(uploads)
+                    complete=await command({'method':'pump'});assert complete['native_root_replies']>=1
+                    assert len(file_reads)==1 and len(uploads)==upload_before+1
+                    assert controller_store.db.execute("SELECT COUNT(*) FROM gateway_outbox WHERE state!='delivered'").fetchone()[0]==0
+                    process.stdin.write(json.dumps({'method':'close'})+'\n');process.stdin.flush();await done(process)
+                    process=spawn('controller');assert await line(process)=={'controller_native_ready':True}
+                    assert await command({'method':'forward'})==first
+                    assert await command({'method':'pump'})=={'native_root_replies':0} and len(controller_store.list())==1
+                    assert len(file_reads)==1 and len(uploads)==upload_before+1
+                    process.stdin.write(json.dumps({'method':'close'})+'\n');process.stdin.flush();await done(process)
+                    cases.append('actual_gateway_UID_native_NIP42_duplicate_receive_independent_FULL_original_and_native_parent_journals_forward_to_real_root_Controller_Unix_SO_PEERCRED_and_changed_epoch_is_denied')
+                    cases.append('actual_foreign_agent_UID_with_socket_group_access_is_denied_by_real_root_Controller_SO_PEERCRED_before_any_gateway_request')
+                    cases.append('actual_root_mission_and_completed_controller_event_context_flow_through_native_BuzzAdapter_send_signed_custody_before_HTTP_and_actual_root_outbox_ack_without_agent_inference_fixture')
+                    cases.append('actual_gateway_process_restart_reuses_native_input_and_root_mission_then_creates_no_duplicate_mission_or_native_delivery_after_confirmed_root_ack')
+                    cases.append('actual_root_controller_manifest_begin_chunk_RPC_and_authenticated_bounded_agent_file_HTTP_reader_feed_sealed_native_Blossom_upload_and_native_imeta_reply_then_restart_performs_no_export_reupload_or_duplicate_send_with_only_agent_artifact_HTTP_endpoint_a_fixture')
+                finally:
+                    if process.poll() is None:process.kill();await asyncio.to_thread(process.wait)
+                    root_server.close();await root_server.wait_closed();await artifact_runner.cleanup();controller_store.close()
+                import venv
+                installed=Path('/usr/lib/haos/hermes/.venv');venv.EnvBuilder(with_pip=False).create(installed)
+                site=installed/'lib/python3.11/site-packages';site.mkdir(parents=True,exist_ok=True)
+                (site/'haos-installed.pth').write_text('/sdk\n/usr/lib/haos\n/usr/lib/haos/hermes-source\n')
+                saved_private=etc/'gateway-credentials'
+                saved_private.write_text(json.dumps({'connectors':{'buzz':value},'publication':'e'*64}));saved_private.chmod(0o600)
+                # Preserve any WAL-resident commits when staging the fixture
+                # journal at the production filename. Perform SQLite backup as
+                # the actual journal UID; root never opens it for migration.
+                backup_code='''import sqlite3,os
+source=sqlite3.connect('file:/var/lib/haos-gateway/controller-native.db?mode=ro',uri=True)
+target=sqlite3.connect('/var/lib/haos-gateway/native-inbox.db')
+try:source.backup(target)
+finally:target.close();source.close()
+os.chmod('/var/lib/haos-gateway/native-inbox.db',0o600)
+'''
+                backup=subprocess.run([sys.executable,'-c',backup_code],user=65534,group=65534,extra_groups=[],
+                    capture_output=True,text=True,env={'PATH':'/usr/bin:/bin'},timeout=10)
+                assert backup.returncode==0 and not backup.stdout and not backup.stderr
+                from haos.buzz_owner_process import command as owner_command
+                isolated={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8','HERMES_SAFE_MODE':'1'}
+                for denied_uid in [0,65533]:
+                    refused=subprocess.run(owner_command(),input='',capture_output=True,text=True,user=denied_uid,
+                        group=65534,extra_groups=[],env=isolated,timeout=10)
+                    assert refused.returncode!=0 and 'gateway runtime requires its unprivileged service UID/GID' in refused.stderr
+                denied_code='''from haos import buzz_owner_setup as owner
+for action in [lambda:owner.saved('buzz'),lambda:owner.inspect('buzz'),
+    lambda:owner.recover_upload('buzz',{},'purge-upload','foreign UID',confirmed=True),
+    lambda:owner.approve_reply('buzz',{},'foreign UID',confirmed=True,confirmed_not_delivered=True)]:
+    try:action()
+    except PermissionError:continue
+    raise AssertionError('foreign UID entered Buzz owner management')
+import sys
+assert 'gateway.config' not in sys.modules and 'plugins' not in sys.modules
+print('owner-actions-denied-before-sdk')
+'''
+                refused=subprocess.run([str(installed/'bin/python'),'-E','-s','-c',denied_code],capture_output=True,text=True,
+                    user=65533,group=65534,extra_groups=[],cwd='/usr/lib/haos',env=isolated,timeout=10)
+                assert refused.returncode==0 and refused.stdout.strip()=='owner-actions-denied-before-sdk',refused.stderr
+                parent_code='''import subprocess
+from haos.buzz_owner_process import command
+result=subprocess.run(command(),input='',capture_output=True,text=True,timeout=10)
+assert result.returncode!=0 and 'actual authenticated root parent' in result.stderr
+print('unprivileged-parent-refused')
+'''
+                refused=subprocess.run([str(installed/'bin/python'),'-E','-s','-c',parent_code],capture_output=True,text=True,
+                    user=65534,group=65534,extra_groups=[],cwd='/usr/lib/haos',env=isolated,timeout=15)
+                assert refused.returncode==0 and refused.stdout.strip()=='unprivileged-parent-refused',refused.stderr
+                cases.append('actual_root_and_foreign_UID_are_denied_by_private_owner_worker_and_four_owner_backend_actions_refuse_foreign_UID_before_optional_native_import')
+                cases.append('actual_gateway_UID_cannot_start_owner_worker_under_its_own_unprivileged_parent_even_though_runtime_UID_matches')
+                from haos import buzz_owner_setup,initial_setup,gateway_setup
+                # Only the systemd service-stop boundary is a fixture in this
+                # fresh non-systemd namespace. Both profiles are already closed;
+                # root-parent validation, UID drop, files and journals are real.
+                old_quiesce=initial_setup.quiesce_for_setup;old_stopped=gateway_setup.stopped_gateway
+                initial_setup.quiesce_for_setup=lambda **kwargs:None;gateway_setup.stopped_gateway=lambda:None
+                try:
+                    mode['name']='owner';writes_before=len(outgoing)
+                    checked=await asyncio.to_thread(buzz_owner_setup.inspect,'buzz')
+                    assert checked['identity_verified'] is True and checked['read_query_succeeded'] is True,checked
+                    assert checked['message_sent'] is False and checked['channels_checked']==1 and len(outgoing)==writes_before
+                    queries_before=len(queries)
+                    for bad_key in ['nsec1'+'q'*58,peer_scalar]:
+                        saved_private.write_text(json.dumps({'connectors':{'buzz':{**value,'private_key':bad_key}},'publication':'e'*64}));saved_private.chmod(0o600)
+                        refused=await asyncio.to_thread(buzz_owner_setup.inspect,'buzz')
+                        assert refused=={'error':'identity-refused'} and len(queries)==queries_before,refused
+                    saved_private.write_text(json.dumps({'connectors':{'buzz':value},'publication':'e'*64}));saved_private.chmod(0o600)
+                    outputs=await asyncio.to_thread(buzz_owner_setup.inspect,'buzz','outputs')
+                    assert len(outputs['outputs'])==1 and outputs['private_bytes_returned'] is False,outputs
+                    row=outputs['outputs'][0];assert row['current_grant'] is True and row['state']=='ready'
+                    refused=await asyncio.to_thread(buzz_owner_setup.recover_upload,'buzz',row,'purge-upload','fixture active grant',confirmed=True)
+                    assert refused=={'error':'authority-refused'},refused
+                    outbox=await asyncio.to_thread(buzz_owner_setup.inspect,'buzz','outgoing')
+                    assert outbox['outgoing'] and all(row['state']=='confirmed' for row in outbox['outgoing'])
+                    publish({**config,'bindings':[],'publication':'f'*64})
+                    saved_private.write_text(json.dumps({'connectors':{'buzz':value},'publication':'f'*64}));saved_private.chmod(0o600)
+                    outputs=await asyncio.to_thread(buzz_owner_setup.inspect,'buzz','outputs');row=outputs['outputs'][0]
+                    assert row['purge_allowed'] is True and row['current_grant'] is False
+                    result=await asyncio.to_thread(buzz_owner_setup.recover_upload,'buzz',row,'purge-upload','fixture inspected withdrawn grant',confirmed=True)
+                    assert result['tombstones_retained'] is True and result['message_sent'] is False,result
+                    assert await asyncio.to_thread(buzz_owner_setup.recover_upload,'buzz',row,'purge-upload','fixture inspected withdrawn grant',confirmed=True)==result
+                    retained=await asyncio.to_thread(buzz_owner_setup.inspect,'buzz','outputs')
+                    tombstone=retained['outputs'][0];assert tombstone['state']=='purged' and tombstone['stored_bytes']==tombstone['source_bytes']==0
+                    assert len(outgoing)==writes_before
+                    cases.append('actual_root_owner_drops_to_installed_gateway_UID_for_native_read_only_CLI_account_check_and_finite_output_and_confirmed_reply_inspection_with_no_send_or_grant_creation')
+                    cases.append('actual_owner_private_worker_rejects_bad_nsec_checksum_and_mismatched_native_public_identity_before_any_TLS_query_with_finite_nonprivate_diagnostic')
+                    cases.append('actual_authenticated_root_parent_private_gateway_UID_owner_disposal_denies_active_grant_then_retains_idempotent_audited_tombstone_after_real_root_publication_withdrawal_without_credential_or_journal_bytes_returned')
+                finally:
+                    initial_setup.quiesce_for_setup=old_quiesce;gateway_setup.stopped_gateway=old_stopped
             finally:await public_runner.cleanup()
         finally:
             for connection in active:await connection.close()
@@ -902,7 +1130,11 @@ except PermissionError as error:
     print(json.dumps({'passed':len(cases),'cases':cases,'actual_UID_TLS_native_auth_subscription_and_MessageEvent':True,
         'actual_FULL_original_native_inbox_and_parent_relay_custody':True,
         'actual_private_profile_lease_lifecycle_native_text_and_revocation':True,
-        'production_runtime_factory_root_controller_mission_media_delivery_GUI_or_public_activation':False},indent=2))
+        'actual_root_controller_Unix_peer_authority_mission_context_and_native_output':True,
+        'agent_artifact_HTTP_endpoint_fixture':True,
+        'actual_root_parent_gateway_UID_owner_account_inventory_and_disposal':True,
+        'owner_service_stop_systemd_boundary_fixture':True,
+        'production_runtime_factory_owner_GUI_public_activation_live_inference_or_delivery':False},indent=2))
 
 
 if __name__=='__main__':main()

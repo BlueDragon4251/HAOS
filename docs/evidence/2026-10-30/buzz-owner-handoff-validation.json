@@ -1,0 +1,122 @@
+{
+  "date_utc": "2026-10-30",
+  "parent_commit": "2d0ade1837d31da16d77c4557770c73812333e14",
+  "tested_source_tree_before_this_receipt": "5b8b80fbe6567646f09df5ff0725ea4af7b06f72",
+  "source_files_sha256": {
+    "docs/GATEWAY-BUZZ.md": "b2f6211a18d4ba803221454bed82b2bbb330d6e12764cefa1db71d5a337d56ec",
+    "linux/haos/haos/buzz_owner_process.py": "db39774e505ab9cc871ab212bdc80b0e9ce565f86f7b257513da0a68dd49f91b",
+    "linux/haos/haos/buzz_owner_setup.py": "75c164c254cb0fcfc67b1f631cdda947d6ba4459e9d4d24edf8dab9557f9da7f",
+    "linux/haos/haos/buzz_owner_worker.py": "81a2efb2c1736ec13f2cc2a83ba885569215bcddce6b5fb1bda87c8c9387dd2f",
+    "linux/haos/probes/probe_buzz_socket_process.py": "c6c5a14e49bf45b7096adc94d3681fca84d60ed31acac89175a876c5c36737d6",
+    "linux/haos/tests/test_buzz_owner_process.py": "6fc4692f3ccce27d2edf3ea4e01ab3e9cd88f36bd2a7c3c1ee25fd8a129d87e6"
+  },
+  "pinned_Hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "public_gateways": 14,
+  "buzz_public_activation": false,
+  "validation": {
+    "minimal": {
+      "passed": 2629,
+      "existing_skips": 2
+    },
+    "full": {
+      "passed": 2629,
+      "existing_skips": 2
+    },
+    "actual_kernel_root": 172,
+    "actual_UID_process": 53
+  },
+  "process_receipt": {
+    "passed": 53,
+    "cases": [
+      "actual_root_agent_UID_and_gateway_with_supplementary_root_group_are_refused_before_optional_native_SDK_import_or_credential_parsing_in_private_profile_factory",
+      "actual_private_UID_fixed_official_CLI_rejects_writes_unknown_peers_channels_and_duplicate_flags_before_HTTP_and_filters_native_discovery_to_owner_channels",
+      "actual_official_CLI_auth_refusal_is_sticky_without_retry_or_empty_history_and_reflected_private_material_or_wrong_public_identity_never_reaches_native_adapter",
+      "actual_gateway_UID_fixed_CLI_peer_PID_SDK_verification_and_FULL_signed_original_commit_precede_HTTP_publication_and_exact_native_reply_receipt",
+      "actual_private_signed_original_custody_refusal_never_publishes_and_post_ack_body_disconnect_retries_only_same_event_then_reports_uncertain_without_new_process_or_resigning",
+      "fresh_gateway_UID_process_replays_exact_retained_signed_original_through_sealed_memfd_and_actual_native_SDK_verification_without_new_timestamp_signature_or_event_identity",
+      "actual_installed_private_UID_native_NIP42_signing_and_guarded_verified_WSS_authenticate_exact_identity_relay_and_challenge_without_private_key_on_wire",
+      "actual_native_subscription_and_MessageEvent_path_deliver_only_explicit_signed_peer_and_channel_after_signature_capture_and_native_duplicate_filter",
+      "actual_private_FULL_original_native_inbox_and_parent_relay_reopen_preserve_first_signed_source_and_never_duplicate_local_admission_on_native_replay",
+      "actual_private_original_custody_refuses_invalid_signature_time_mention_thread_private_key_reflection_and_unapproved_voice_before_new_inbox_or_media_use",
+      "Nostr_signature_randomness_replay_keeps_first_valid_original_without_new_semantic_message_or_local_admission",
+      "actual_SQL_receipt_failure_after_native_and_parent_commit_reopens_and_reconciles_without_new_local_delivery_or_fake_mission",
+      "changed_retained_original_bytes_are_refused_without_automatic_restoration_or_discarding_source_tombstone",
+      "actual_UID_official_CLI_signed_query_and_FULL_history_reopen_page_121_same_second_events_without_native_50_event_truncation_or_new_source_on_replayed_page",
+      "actual_SQL_history_cursor_commit_failure_after_50_verified_original_commits_keeps_revision_zero_then_reconciles_exact_page_after_process_reopen",
+      "actual_native_CLI_rejects_malformed_HTTP_history_without_false_empty_list_or_completed_sweep_and_saved_cursor_remains_unchanged",
+      "actual_native_BuzzAdapter_send_runs_only_behind_current_independent_source_and_outbox_authority_and_repeated_confirmed_attempt_returns_same_receipt_without_HTTP",
+      "actual_SQL_acceptance_commit_failure_reopens_uncertain_and_never_automatically_republishes_or_signs_new_id_for_same_outbox_attempt",
+      "stopped_private_profile_owner_inspection_rejects_stale_snapshot_then_idempotent_approved_next_attempt_replays_identical_signed_event_through_actual_native_send_and_new_UID_process",
+      "actual_native_text_MessageEvent_and_independent_parent_relay_admit_strip_public_and_named_mentions_without_exposing_raw_original_or_creating_another_parent_receipt_on_reopen",
+      "actual_SQL_native_commit_and_original_receipt_failures_reconcile_after_fresh_processes_without_duplicate_parent_admission_and_retain_first_command_projection_across_display_name_change",
+      "actual_private_socket_refuses_unapproved_channel_before_any_subscription_frame_reaches_relay",
+      "actual_verified_TLS_WebSocket_302_is_not_followed_and_never_receives_native_authentication",
+      "actual_relay_AUTH_refusal_produces_no_subscription_or_native_message_readiness",
+      "actual_private_profile_fixed_CLI_native_NIP42_WSS_durable_parent_admission_identity_lease_and_root_publication_replacement_stop_live_native_socket_without_waiting_for_new_network_input",
+      "actual_401_private_profile_refusal_persists_across_new_UID_processes_and_same_credential_identity_never_retries_or_reports_readiness_after_restart",
+      "actual_root_owned_policy_replacement_prevents_further_use_of_existing_authenticated_socket",
+      "actual_gateway_UID_original_signature_media_grant_native_imeta_and_bare_URL_decoding_preserve_image_document_and_voice_kinds_with_private_FULL_cache_and_parent_media_ids",
+      "same_relay_private_media_uses_actual_Blossom_signer_while_explicit_foreign_TLS_origin_receives_no_authentication_and_duplicate_imeta_body_URL_is_one_resource",
+      "actual_gateway_UID_native_voice_media_controller_composition_and_pinned_offline_ASR_reach_only_text_agent_terminal_without_raw_audio_and_replay_creates_no_new_ASR_or_mission_with_private_IPC_and_terminal_fixture_seams",
+      "actual_SQL_blob_insertion_failure_keeps_first_byte_receipt_then_new_private_process_refetches_only_exact_original_hash_MIME_and_descriptor_before_native_admission",
+      "actual_private_resource_hash_mismatch_never_reaches_parent_and_media_control_command_is_refused_before_spending_network_credentials",
+      "actual_damaged_retained_media_after_parent_commit_failure_is_refused_on_private_process_reopen_without_refetch_or_automatic_restoration",
+      "actual_voice_bytes_labeled_octet_stream_never_become_document_media_or_reach_ASR_or_parent_when_only_general_media_is_approved",
+      "signed_foreign_media_origin_without_explicit_owner_approval_is_refused_before_original_admission_or_any_HTTP_credentials",
+      "actual_gateway_UID_uploads_only_sealed_inherited_memory_bytes_using_native_Blossom_SDK_signature_exact_identity_hash_server_expiry_and_then_verifies_the_stored_content_addressed_blob_over_TLS",
+      "private_upload_refuses_credential_bytes_and_oversized_input_before_HTTP_and_authentication_before_invalid_error_body_with_no_retry",
+      "actual_native_upload_429_retries_only_three_identical_blobs_and_redirect_or_malformed_or_oversized_response_never_publishes_a_message",
+      "foreign_upload_descriptor_never_gains_network_authority_and_changed_stored_bytes_never_become_a_publishable_attachment",
+      "actual_native_file_message_uses_sealed_uploaded_descriptor_without_reupload_and_preserves_exact_native_imeta_hash_size_MIME_name_URL_body_reply_and_FULL_signed_original_before_HTTP",
+      "actual_UID_root_snapshot_RPC_component_fixture_retains_source_and_native_upload_bytes_then_reuses_exact_SQL_descriptor_after_process_reopen_without_network_or_new_artifact_read",
+      "actual_SQL_failure_after_successful_upload_retains_unresolved_intent_and_new_process_refuses_automatic_reupload_while_damaged_ready_custody_never_refetches_or_restores_blob",
+      "fixture_owner_upload_decision_rejects_stale_inspection_and_is_idempotent_then_new_gateway_UID_process_consumes_exact_one_retry_with_original_root_snapshot_bytes_and_actual_native_Blossom_upload",
+      "actual_gateway_UID_native_NIP42_duplicate_receive_independent_FULL_original_and_native_parent_journals_forward_to_real_root_Controller_Unix_SO_PEERCRED_and_changed_epoch_is_denied",
+      "actual_foreign_agent_UID_with_socket_group_access_is_denied_by_real_root_Controller_SO_PEERCRED_before_any_gateway_request",
+      "actual_root_mission_and_completed_controller_event_context_flow_through_native_BuzzAdapter_send_signed_custody_before_HTTP_and_actual_root_outbox_ack_without_agent_inference_fixture",
+      "actual_gateway_process_restart_reuses_native_input_and_root_mission_then_creates_no_duplicate_mission_or_native_delivery_after_confirmed_root_ack",
+      "actual_root_controller_manifest_begin_chunk_RPC_and_authenticated_bounded_agent_file_HTTP_reader_feed_sealed_native_Blossom_upload_and_native_imeta_reply_then_restart_performs_no_export_reupload_or_duplicate_send_with_only_agent_artifact_HTTP_endpoint_a_fixture",
+      "actual_root_and_foreign_UID_are_denied_by_private_owner_worker_and_four_owner_backend_actions_refuse_foreign_UID_before_optional_native_import",
+      "actual_gateway_UID_cannot_start_owner_worker_under_its_own_unprivileged_parent_even_though_runtime_UID_matches",
+      "actual_root_owner_drops_to_installed_gateway_UID_for_native_read_only_CLI_account_check_and_finite_output_and_confirmed_reply_inspection_with_no_send_or_grant_creation",
+      "actual_owner_private_worker_rejects_bad_nsec_checksum_and_mismatched_native_public_identity_before_any_TLS_query_with_finite_nonprivate_diagnostic",
+      "actual_authenticated_root_parent_private_gateway_UID_owner_disposal_denies_active_grant_then_retains_idempotent_audited_tombstone_after_real_root_publication_withdrawal_without_credential_or_journal_bytes_returned"
+    ],
+    "actual_UID_TLS_native_auth_subscription_and_MessageEvent": true,
+    "actual_FULL_original_native_inbox_and_parent_relay_custody": true,
+    "actual_private_profile_lease_lifecycle_native_text_and_revocation": true,
+    "actual_root_controller_Unix_peer_authority_mission_context_and_native_output": true,
+    "agent_artifact_HTTP_endpoint_fixture": true,
+    "actual_root_parent_gateway_UID_owner_account_inventory_and_disposal": true,
+    "owner_service_stop_systemd_boundary_fixture": true,
+    "production_runtime_factory_owner_GUI_public_activation_live_inference_or_delivery": false
+  },
+  "program_source_manifest_sha256": "90dfee186b8094043004c979fddfcfdbf250a85b214f08ceb784752fee03a09d",
+  "program_sha256": {
+    "buzz": "33b47244b411673c5f232951e3f0d4b6e3ad5c0177c32260a7905676d0472363",
+    "haos-buzz-verify": "a231bb3e05948082d87dc5854cb11d955de64540c03329f72743237d27418301"
+  },
+  "logs_sha256": {
+    "buzz-owner-secured-handoff-minimal.log": "a21e66a8169acfe050e617c7cd6592155d8a32a3a627f1f11317a04d394524a7",
+    "buzz-owner-secured-handoff-full.log": "03123c57b332cf0178b16dab369b14b66ae4ec525f8ca40682239bfd400149f3",
+    "buzz-owner-secured-handoff-kernel.log": "5d0b7b669590ac377b90a04d7e3adb966c540cf3ea0936b72df59343b6a69e3d",
+    "buzz-owner-secured-handoff-process.json": "a6ae80a8b1765f50f5becdacd1e4e3bef7c25d1408f5be847e79720674f93340",
+    "buzz-owner-secured-handoff-process.err": "d5196ae62867af64ae88483f7e7b82445df37b0c365b9df86fd6f17ac6ba3629"
+  },
+  "expected_stderr": "Two actual controller control.denied audit events, foreign UID and changed grant digest. No traceback or private material.",
+  "scope_limits": [
+    "Actual root Controller Unix peer authorization, native ingress, real mission/outbox, controller manifest/begin/chunk exports, native upload/file reply and restart.",
+    "Agent artifact HTTP endpoint is a fixture, not actual model inference.",
+    "Authenticated root parent hands account/cache/outbox inspection and disposal to installed gateway UID; only the service-stop boundary is substituted in this non-systemd namespace.",
+    "Public factory, CLI/GUI wiring, authentication recheck, complete owner recovery coverage and packaging/CI remain unfinished.",
+    "No external relay/recipient delivery/read, installed OS, release or hardware acceptance."
+  ],
+  "CI": {
+    "exact_source_head": "8140d71c112396124ba0acde25e30ff3082c7521",
+    "services_run": 41032378663,
+    "attempt_1": "failure at bounded systemd application unit; cause not established, log download unavailable",
+    "attempt_2": "success without source changes",
+    "provider_contracts_41032378739_and_41032371042": "still in progress at last check",
+    "applies_to_this_receipt": false
+  }
+}
