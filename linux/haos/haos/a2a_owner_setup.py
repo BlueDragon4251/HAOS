@@ -127,24 +127,21 @@ def public(value):
             'saved_callback_secret':peer in value.get('callbacks',{})} for peer in value['peer_tokens']]}
 
 
-def inspect(connector,action='inspect',cursor=''):
+def _invoke(connector,action,params):
     from .initial_setup import require_root,quiesce_for_setup
     from .gateway_setup import stopped_gateway
     from .gateway_a2a import authority
-    from .a2a_owner_process import command,response,cursor_value
+    from .a2a_owner_process import command,response
     from .gateway_line_ingress import _object
     from .gateway_dingtalk_admission import finite
     from .owner import audit
     import json,os,pwd,subprocess
     require_root()
-    if action not in {'inspect','sources'}:raise ValueError('select a closed A2A no-send inspection action')
-    cursor_value(cursor)
-    if action=='inspect' and cursor:raise ValueError('listener inspection does not use a source cursor')
     quiesce_for_setup(gateway_only=True);stopped_gateway();_,_,value=saved(connector)
     publication=authority(connector,value);account=pwd.getpwnam('haos-gateway')
     if account.pw_uid==0 or account.pw_gid==0:raise PermissionError('A2A owner inspection must use the separate private gateway UID')
     request={'action':action,'connector':connector,'credentials':value,'policy_sha256':publication,'parent_pid':os.getpid(),
-        'params':{'cursor':cursor} if action=='sources' else {}}
+        'params':params}
     try:
         result=subprocess.run(command(),input=json.dumps(request,ensure_ascii=False)+'\n',text=True,capture_output=True,timeout=25,
             user=account.pw_uid,group=account.pw_gid,extra_groups=[],umask=0o077,cwd='/usr/lib/haos',
@@ -155,5 +152,28 @@ def inspect(connector,action='inspect',cursor=''):
     secrets=[*value['peer_tokens'].values(),value['tls']['private_key'],*[item['secret'] for item in value.get('callbacks',{}).values()]]
     if Redactor(secrets).text(result.stdout)!=result.stdout:raise PermissionError('private material in A2A inspection response')
     checked=response(json.loads(result.stdout,object_pairs_hook=_object,parse_constant=finite),action)
-    authority(connector,value,publication);audit('gateway.a2a-owner-inspected',{'connector':connector,'action':action,'message_sent':False})
+    authority(connector,value,publication);audit('gateway.a2a-owner-inspected' if action in {'inspect','sources'} else 'gateway.a2a-owner-recovered',
+        {'connector':connector,'action':action,'message_sent':False,**({'receipt':checked['receipt'],'note_sha256':params['note_sha256']} if 'receipt' in checked else {})})
     return checked
+
+
+def inspect(connector,action='inspect',cursor=''):
+    from .a2a_owner_process import cursor_value
+    if action not in {'inspect','sources'}:raise ValueError('select a closed A2A no-send inspection action')
+    cursor_value(cursor)
+    if action=='inspect' and cursor:raise ValueError('listener inspection does not use a source cursor')
+    return _invoke(connector,action,{'cursor':cursor} if action=='sources' else {})
+
+
+def recover(connector,row,action,note,*,confirmed=False):
+    from .initial_setup import require_root
+    from .a2a_owner_process import response
+    from .a2a_owner_recovery import ACTIONS,parameters
+    from .gateway import digest
+    require_root()
+    if action not in ACTIONS or confirmed is not True or not isinstance(note,str) or not 1<=len(note.strip())<=2000:
+        raise PermissionError('explicit inspected owner recovery decision and bounded review note required')
+    response({'tasks':[row],'has_more':False,'cursor':'','message_sent':False,'mission_created':False},'sources')
+    params={key:row[key] for key in ['profile','peer_journal','task_id','snapshot_sha256']}
+    params['note_sha256']=digest(note.strip());parameters(params)
+    return _invoke(connector,action,params)

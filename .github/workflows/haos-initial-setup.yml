@@ -543,6 +543,8 @@ jobs:
           xvfb-run -a -s '-screen 0 1280x800x24' /usr/bin/python3 linux/haos/runtime/probe_email_owner_gui.py linux/haos
           xvfb-run -a -s '-screen 0 1280x800x24' /usr/bin/python3 linux/haos/runtime/probe_feishu_owner_gui.py linux/haos
           xvfb-run -a -s '-screen 0 640x480x24' /usr/bin/python3 linux/haos/runtime/probe_feishu_owner_gui.py linux/haos
+          xvfb-run -a -s '-screen 0 1280x800x24' /usr/bin/python3 linux/haos/runtime/probe_a2a_owner_gui.py linux/haos
+          xvfb-run -a -s '-screen 0 640x480x24' /usr/bin/python3 linux/haos/runtime/probe_a2a_owner_gui.py linux/haos
           xvfb-run -a -s '-screen 0 1280x800x24' /usr/bin/python3 linux/haos/runtime/probe_dingtalk_owner_gui.py linux/haos
           xvfb-run -a -s '-screen 0 640x480x24' /usr/bin/python3 linux/haos/runtime/probe_dingtalk_owner_gui.py linux/haos
           xvfb-run -a -s '-screen 0 640x480x24' /usr/bin/python3 linux/haos/runtime/probe_email_owner_gui.py linux/haos

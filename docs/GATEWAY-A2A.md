@@ -411,3 +411,41 @@ reachability or complete GUI acceptance. Minimal/full regression each passes
 The crypto-dependent owner snapshot cases run with real PEMs in the actual UID
 process fixture; minimal unit contracts require no optional SDK or crypto import.
 Owner GUI wiring, recovery actions and public activation remain outstanding.
+
+### Owner forms and explicit local recovery (prepared activation)
+
+The real graphical gateway page now has A2A server/TLS/named-peer entry,
+separate HTTPS download origins and callback keys, exact-context pairing with
+independent media/voice/video/output/callback choices, a no-send local runtime
+inspection and paginated historical task inspection. Saved private material is
+never read back into the forms. Changing a public identity clears transient
+keys and permission selections. Native pause/resume is unavailable and cannot
+be granted through this form. Both 1280×800 and 640×480 GUI contracts exercise
+actual Tk widgets; privileged handoffs in those GUI fixtures are substituted,
+while the installed-code process fixture separately exercises the real owner
+backend with actual private UIDs, root-owned files, TLS and controller sockets.
+
+Recovery requires selecting the exact inspected snapshot, entering an owner
+review note and explicitly confirming the decision. Only its digest is retained
+in audit. A publication-pinned one-shot worker with no new privileges performs
+no network send and creates no mission. Current, unadmitted working sources can
+reset only authentication-refused HTTPS resources; original codec, account,
+message, bytes and exact grant must still validate. Retained/consumed resources
+are not fetched or restored by this operation. Normal gateway recovery may
+attempt that unchanged resource after a deliberate service restart.
+
+For terminal tasks with withdrawn grants, the owner can remove original/input
+snapshot bytes or output artifact bytes. Uncertain transitions, controls and
+result epochs prevent these actions. Task metadata, source proofs, tombstones,
+artifact metadata and delivery receipts remain. This is logical removal from
+the selected journal, not secure erasure or removal of separate cache, agent,
+controller or backup copies. No task outcome is guessed or overwritten.
+
+Every successful mutation and its exact owner-decision receipt commit in one
+FULL SQLite transaction in the affected journal. Repeating the same inspected
+action and review decision returns its durable receipt even if the first owner
+reply was lost. A different decision against a stale snapshot requires a fresh
+inspection. Incoming HTTPS 429 now persists the bounded, credential-filtered
+Retry-After value, verified through actual TLS response/reopen fixtures.
+Public runtime registration remains a separate unfinished step; A2A still does
+not increase the 13/22 public software count at this checkpoint.

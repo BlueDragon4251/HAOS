@@ -741,7 +741,8 @@ asyncio.run(exercise())
             denied_code='''from haos import a2a_owner_setup as owner
 actions=[lambda:owner.configure('a2a',{}),lambda:owner.save_account('a2a',{},'alice',''),lambda:owner.saved('a2a'),
 lambda:owner.set_peer('a2a','alice',''),lambda:owner.remove_peer('a2a','alice'),
-lambda:owner.pair('owner','a2a','alice','ctx-input','personal',['create','read']),lambda:owner.inspect('a2a')]
+lambda:owner.pair('owner','a2a','alice','ctx-input','personal',['create','read']),lambda:owner.inspect('a2a'),
+lambda:owner.recover('a2a',{},'purge-source-inputs','foreign UID',confirmed=True)]
 for action in actions:
     try:action()
     except PermissionError:continue
@@ -753,7 +754,7 @@ print('all-owner-actions-denied-before-sdk')
             rejected=subprocess.run([str(installed/'bin/python'),'-E','-s','-c',denied_code],capture_output=True,text=True,
                 user=65533,group=65534,extra_groups=[],cwd='/usr/lib/haos',env=isolated,timeout=10)
             assert rejected.returncode==0 and rejected.stdout.strip()=='all-owner-actions-denied-before-sdk',rejected.stderr
-            cases.append('actual_owner_backend_rejects_seven_foreign_UID_actions_before_SDK_and_private_inspection_worker_rejects_root_and_agent_UID')
+            cases.append('actual_owner_backend_rejects_eight_foreign_UID_actions_before_SDK_and_private_inspection_worker_rejects_root_and_agent_UID')
             # No systemd runs in this offline namespace. Only the service-stop
             # boundary is a fixture; worker UID, saved files, runtime checks,
             # parent lifetime, TLS validation and private journals are real.
@@ -772,6 +773,48 @@ print('all-owner-actions-denied-before-sdk')
                 assert any(row['callbacks'].get('acknowledged') for row in inventory['tasks'])
                 assert len(store.list())==12 and all(secret not in json.dumps(inventory) for secret in [*value['peer_tokens'].values(),value['callbacks']['alice']['secret']])
                 cases.append('actual_owner_private_UID_readonly_inventory_exposes_retained_tasks_media_auth_refusal_callback_receipts_and_withdrawn_grants_without_raw_URI_keys_or_new_missions')
+                rejected=next(row for row in inventory['tasks'] if row['native_state']=='TASK_STATE_REJECTED')
+                working=next(row for row in inventory['tasks'] if row['native_state']=='TASK_STATE_WORKING')
+                denied=a2a_owner_setup.recover('a2a',working,'purge-source-inputs','fixture terminal-state review',confirmed=True)
+                assert denied=={'error':'authority-refused'},denied
+                assert a2a_owner_setup.recover('a2a',working,'retry-source-auth','fixture revoked-grant review',confirmed=True)=={'error':'authority-refused'}
+                cases.append('actual_private_UID_owner_recovery_refuses_active_or_unreconciled_sources_and_never_retries_withdrawn_authentication')
+                purged=a2a_owner_setup.recover('a2a',rejected,'purge-source-inputs','fixture inspected rejected source',confirmed=True)
+                assert purged.get('affected')==1 and purged['removed_bytes']>0 and purged['message_sent'] is False,purged
+                repeated=a2a_owner_setup.recover('a2a',rejected,'purge-source-inputs','fixture inspected rejected source',confirmed=True)
+                assert repeated==purged
+                after=a2a_owner_setup.inspect('a2a','sources');retained_rejected=next(row for row in after['tasks'] if row['task_id']==rejected['task_id'])
+                assert len(after['tasks'])==len(inventory['tasks']) and not retained_rejected['original_retained']
+                assert retained_rejected['native_state']=='TASK_STATE_REJECTED' and not retained_rejected['parent_admitted'] and len(store.list())==12
+                stale=a2a_owner_setup.recover('a2a',rejected,'purge-source-inputs','fixture different review cannot reuse stale snapshot',confirmed=True)
+                assert stale=={'error':'authority-refused'},stale
+                cases.append('actual_private_UID_atomic_logical_original_purge_preserves_task_and_replay_tombstones_and_idempotently_replays_receipt_after_lost_owner_response')
+                output_source=next(row for row in inventory['tasks'] if row['task_id']==output_task)
+                removed_output=a2a_owner_setup.recover('a2a',output_source,'purge-task-outputs','fixture inspected withdrawn completed artifact',confirmed=True)
+                assert removed_output.get('affected')==1 and removed_output['removed_bytes']==len(file_bytes),removed_output
+                assert a2a_owner_setup.recover('a2a',output_source,'purge-task-outputs','fixture inspected withdrawn completed artifact',confirmed=True)==removed_output
+                with sqlite3.connect('file:'+str(source)+'?mode=ro',uri=True) as checked_db:
+                    artifact_rows=checked_db.execute('SELECT metadata,length(data) FROM a2a_output_artifacts WHERE task_id=?',(output_task,)).fetchall()
+                    assert len(artifact_rows)==1 and all(metadata and size==0 for metadata,size in artifact_rows)
+                    retained_task=checked_db.execute('SELECT record,admitted_receipt,source_key FROM a2a_tasks WHERE task_id=?',(output_task,)).fetchone()
+                    assert json.loads(retained_task[0])['state']==protocol.STATE_COMPLETED and retained_task[1]==retained_task[2]
+                cases.append('actual_owner_atomic_output_byte_purge_preserves_completed_task_metadata_and_native_and_root_outcome_receipts_without_recreating_exports')
+                # Restore the fixture's unchanged saved epoch solely to exercise
+                # current-grant authentication recovery. A real new owner grant
+                # receives a new epoch and cannot resurrect an old source.
+                publish(config)
+                current_inventory=a2a_owner_setup.inspect('a2a','sources')
+                auth_source=next(row for row in current_inventory['tasks'] if row['resources'].get('authentication-refused'))
+                assert auth_source['current_grant'] and not auth_source['parent_admitted']
+                retried=a2a_owner_setup.recover('a2a',auth_source,'retry-source-auth','fixture exact unchanged source credentials checked',confirmed=True)
+                assert retried.get('affected')==1 and retried['removed_bytes']==0 and retried['message_sent'] is False,retried
+                assert a2a_owner_setup.recover('a2a',auth_source,'retry-source-auth','fixture exact unchanged source credentials checked',confirmed=True)==retried
+                reset=a2a_owner_setup.inspect('a2a','sources')
+                reset_auth=next(row for row in reset['tasks'] if row['task_id']==auth_source['task_id'])
+                assert reset_auth['resources']=={'prepared':1} and reset_auth['resource_attempts']==0 and reset_auth['resource_retry_at']==0
+                assert reset_auth['original_retained'] and not reset_auth['parent_admitted'] and len(store.list())==12
+                publish(changed)
+                cases.append('actual_root_private_UID_authentication_retry_resets_only_unchanged_current_unadmitted_resource_and_persists_idempotent_receipt_without_fetch_or_mission')
                 metadata=initial_setup.gateway_configuration()['a2a']['a2a']
                 assert all(secret not in json.dumps(metadata) for secret in [*value['peer_tokens'].values(),value['callbacks']['alice']['secret'],value['tls']['private_key']])
                 server_fields={key:metadata[key] for key in ['agent_name','port','public_url','bind_host','public_listener']}

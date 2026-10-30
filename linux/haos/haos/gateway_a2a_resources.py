@@ -14,10 +14,11 @@ from .gateway_media_relay import MediaCache
 
 
 class Refused(PermissionError):
-    def __init__(self,reason):
+    def __init__(self,reason,*,retry_seconds=60):
         if reason not in {'authentication-refused','rate-limited','transport-unavailable','source-unavailable','storage-unavailable','private-reflection'}:
             raise ValueError('finite A2A attachment failure required')
-        super().__init__('A2A attachment unavailable; inspect its source and owner permission');self.reason=reason
+        if type(retry_seconds) is not int or not 1<=retry_seconds<=86400:raise ValueError('bounded resource retry delay required')
+        super().__init__('A2A attachment unavailable; inspect its source and owner permission');self.reason=reason;self.retry_seconds=retry_seconds
 
 
 class Resources:
@@ -40,7 +41,9 @@ class Resources:
                     async with client.stream('GET',url) as response:
                         self.current();target(self.value,peer,url)
                         if response.status_code in {401,403}:raise Refused('authentication-refused')
-                        if response.status_code==429:raise Refused('rate-limited')
+                        if response.status_code==429:
+                            from .gateway_retry import retry_after
+                            raise Refused('rate-limited',retry_seconds=retry_after(response.headers.get('Retry-After'),default=60,private_values=self.inbox.redactor.secrets))
                         if (response.status_code!=200 or response.headers.get('Content-Encoding','identity').lower()!='identity'
                                 or response.headers.get('Content-Type',mime).split(';')[0].strip().lower() not in {mime,'application/octet-stream'}):
                             raise Refused('source-unavailable')
@@ -108,7 +111,7 @@ class Resources:
                     except ValueError:raise Refused('source-unavailable') from None
                     if any(secret.encode() in data for secret in self.inbox.redactor.secrets):raise Refused('private-reflection')
                 except Refused as error:
-                    attempt=row['attempt']+1;delay=60 if error.reason=='rate-limited' else min(60,2**min(attempt,6))
+                    attempt=row['attempt']+1;delay=error.retry_seconds if error.reason=='rate-limited' else min(60,2**min(attempt,6))
                     self.db.execute('UPDATE a2a_input_resources SET state=?,attempt=?,next_attempt=?,updated_at=? WHERE raw_id=? AND part_index=?',
                         (error.reason,attempt,time.time()+delay,time.time(),*key));raise
                 self.current();self.policy().current_binding(proof)

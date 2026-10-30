@@ -638,7 +638,7 @@ class Wizard:
                 result_handler=lambda _: self.show("gateways"))).pack(anchor="w", pady=4)
             connector = self._field(self.content, "Konnektor-ID (z. B. telegram-main)", "telegram-main")
             connector_value=tk.StringVar(value=connector.get());connector.configure(textvariable=connector_value);connector._haos_public_value=connector_value
-            platform = self._choice(self.content, "Plattform", ["telegram", "discord", "slack", "mattermost", "matrix", "ntfy", "homeassistant", "irc", "line", "sms", "email", "feishu", "dingtalk"], "telegram")
+            platform = self._choice(self.content, "Plattform", ["telegram", "discord", "slack", "mattermost", "matrix", "ntfy", "homeassistant", "irc", "line", "sms", "email", "feishu", "dingtalk", "a2a"], "telegram")
             token_box=tk.Frame(self.content,bg=self.PANEL);token_box.pack(fill='x')
             token = self._field(token_box, "Bot-Token / Zugangstoken (geschützte Eingabe)", secret=True)
             slack_credentials = tk.Frame(self.content,bg=self.PANEL)
@@ -863,7 +863,16 @@ class Wizard:
             from .dingtalk_owner_gui import AccountForm as DingTalkAccountForm
             dingtalk_form=DingTalkAccountForm(self,self.content,connector.get)
             connector_value.trace_add('write',dingtalk_form.clear_secret)
+            from .a2a_owner_gui import AccountForm as A2AAccountForm,PeerForm as A2APeerForm,RecoveryForm as A2ARecoveryForm
+            a2a_form=A2AAccountForm(self,self.content,connector.get);a2a_peers=A2APeerForm(self,self.content,connector.get)
+            a2a_recovery=A2ARecoveryForm(self,self.content,connector.get)
+            for form in [a2a_form,a2a_peers]:connector_value.trace_add('write',form.clear_secret)
+            def a2a_refreshed(value):
+                a2a_form.reset(value);a2a_peers.reset(value);a2a_pair.route_changed()
+            a2a_form.on_saved=a2a_refreshed;a2a_peers.on_saved=a2a_refreshed
             def configure():
+                if platform.get()=='a2a':
+                    a2a_form.configure();return
                 if platform.get()=='dingtalk':
                     dingtalk_form.configure();return
                 if platform.get()=='feishu':
@@ -911,6 +920,8 @@ class Wizard:
             configure_button.pack(anchor="w", pady=10)
             def platform_changed(*_args):
                 reset_sms();reset_line();email_form.reset();feishu_form.reset();dingtalk_form.reset()
+                a2a_form.reset();a2a_peers.reset()
+                for form in [a2a_form,a2a_peers,a2a_recovery]:form.frame.pack_forget()
                 dingtalk_form.frame.pack_forget()
                 feishu_form.frame.pack_forget()
                 email_form.frame.pack_forget()
@@ -927,12 +938,19 @@ class Wizard:
                     if existing:
                         for field,key in ((irc_server,'server'),(irc_port,'port'),(irc_nick,'nickname'),(irc_channel,'channel')):
                             field.delete(0,tk.END);field.insert(0,str(existing[key]))
-                elif platform.get() in {'line','sms','email','feishu','dingtalk'}:
+                elif platform.get() in {'line','sms','email','feishu','dingtalk','a2a'}:
                     irc_credentials.pack_forget();token_box.pack_forget()
                 else:
                     irc_credentials.pack_forget();token_box.pack(fill='x',before=configure_button)
-                if connector.get() in {'telegram-main','discord-main','slack-main','mattermost-main','matrix-main','ntfy-main','homeassistant-main','irc-main','line-main','sms-main','email-main','feishu-main','dingtalk-main'}:
+                if connector.get() in {'telegram-main','discord-main','slack-main','mattermost-main','matrix-main','ntfy-main','homeassistant-main','irc-main','line-main','sms-main','email-main','feishu-main','dingtalk-main','a2a-main'}:
                     connector.delete(0,tk.END);connector.insert(0,platform.get()+'-main')
+                    if platform.get()=='a2a':
+                        saved_a2a=[row['id'] for row in configured_gateways['connectors'] if row['platform']=='a2a']
+                        if len(saved_a2a)==1:connector.delete(0,tk.END);connector.insert(0,saved_a2a[0])
+                if platform.get()=='a2a':
+                    value=configured_gateways.get('a2a',{}).get(connector.get())
+                    a2a_form.reset(value);a2a_peers.reset(value)
+                    for form in [a2a_form,a2a_peers,a2a_recovery]:form.frame.pack(fill='x',before=configure_button)
                 if platform.get()=='irc':
                     existing=configured_gateways.get('irc',{}).get(connector.get())
                     if existing:
@@ -1323,6 +1341,9 @@ class Wizard:
             from .dingtalk_owner_gui import PairForm as DingTalkPairForm
             dingtalk_pair=DingTalkPairForm(self,self.content,platform,dingtalk_form,sender,chat,scope,thread,rights,pairing_note)
             connector_value.trace_add('write',dingtalk_pair.clear)
+            from .a2a_owner_gui import PairForm as A2APairForm
+            a2a_pair=A2APairForm(self,self.content,platform,a2a_form,sender,chat,scope,thread,rights,rights_widgets,pairing_note)
+            connector_value.trace_add('write',a2a_pair.clear)
             def retry_irc():
                 selected_connector=connector.get()
                 self._run_async(lambda:initial_setup.retry_irc_gateway_auth(selected_connector),
@@ -1331,6 +1352,8 @@ class Wizard:
             def pair_sender():
                 selected = (binding.get(), connector.get(), sender.get(), chat.get(), identity.get(),
                             tuple(key for key, value in rights.items() if value.get()))
+                if platform.get()=='a2a':
+                    a2a_pair.apply(selected);return
                 selected_scope, selected_thread = scope.get(), thread.get()
                 requested_irc_port=None
                 if platform.get()=='irc':

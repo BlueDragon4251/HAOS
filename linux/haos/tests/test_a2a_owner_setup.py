@@ -57,3 +57,20 @@ def test_owner_worker_result_never_claims_network_reachability_or_message_delive
     for field in ['external_reachability_verified','message_sent','mission_created']:
         with pytest.raises(ValueError):response({**result,field:True},'inspect')
     with pytest.raises(ValueError):response({'tasks':[],'has_more':True,'cursor':'','message_sent':False,'mission_created':False},'sources')
+
+
+@pytest.mark.parametrize('action',['retry-source-auth','purge-source-inputs','purge-task-outputs'])
+def test_recovery_receipt_has_closed_no_send_schema_and_never_claims_erasure_or_delivery(action):
+    value={'action':action,'receipt':'a'*64,'affected':1,'removed_bytes':0,'message_sent':False,'mission_created':False}
+    assert response(value,action)==value
+    for changed in [{'message_sent':True},{'mission_created':True},{'securely_erased':True},{'affected':True},{'removed_bytes':-1},{'receipt':'../file'}]:
+        with pytest.raises(ValueError):response({**value,**changed},action)
+
+
+@pytest.mark.parametrize('key,value',[('profile','../owner'),('peer_journal','peer-'+'a'*63),('task_id','task-../secret'),('snapshot_sha256',None),('note_sha256',True)])
+def test_recovery_selection_cannot_escape_fixed_private_journal_or_omit_owner_review(key,value):
+    from haos.a2a_owner_recovery import parameters
+    params={'profile':'a2a-'+'a'*64,'peer_journal':'peer-'+'b'*64,'task_id':'task-'+'c'*16,
+        'snapshot_sha256':'d'*64,'note_sha256':'e'*64}
+    assert parameters(params)==params
+    with pytest.raises(ValueError):parameters({**params,key:value})

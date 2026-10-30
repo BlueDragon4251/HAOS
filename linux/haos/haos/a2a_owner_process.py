@@ -54,7 +54,7 @@ def response(value,action):
         from .gateway import digest
         states={'TASK_STATE_SUBMITTED','TASK_STATE_WORKING','TASK_STATE_INPUT_REQUIRED','TASK_STATE_COMPLETED','TASK_STATE_FAILED','TASK_STATE_CANCELED','TASK_STATE_REJECTED'}
         callback_states={'prepared','retryable','writing','acknowledged','uncertain','authentication-refused','revoked','superseded','damaged','transport-refused'}
-        fields={'profile','peer_journal','task_id','peer','context','native_state','parent_admitted','original_id','source_key','binding_id','binding_digest','credential_scope','current_account','current_grant','uncertain_transitions','uncertain_controls','callbacks','original_retained','resources','resource_attempts','resource_retry_at','snapshot_sha256'}
+        fields={'profile','peer_journal','task_id','peer','context','native_state','parent_admitted','original_id','source_key','binding_id','binding_digest','credential_scope','current_account','current_grant','uncertain_transitions','uncertain_controls','uncertain_results','callbacks','original_retained','resources','resource_attempts','resource_retry_at','snapshot_sha256'}
         for row in value['tasks']:
             if (not isinstance(row,dict) or set(row)!=fields or not isinstance(row['profile'],str) or not re.fullmatch('a2a-[0-9a-f]{64}',row['profile'])
                     or not isinstance(row['peer_journal'],str) or not re.fullmatch('peer-[0-9a-f]{64}',row['peer_journal'])
@@ -67,6 +67,7 @@ def response(value,action):
                     or not isinstance(row['binding_id'],str) or not re.fullmatch('[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,127}',row['binding_id'])
                     or type(row['uncertain_transitions']) is not int or not 0<=row['uncertain_transitions']<=32
                     or type(row['uncertain_controls']) is not int or not 0<=row['uncertain_controls']<=2
+                    or type(row['uncertain_results']) is not int or not 0<=row['uncertain_results']<=32
                     or type(row['current_account']) is not bool or type(row['current_grant']) is not bool or type(row['original_retained']) is not bool
                     or not isinstance(row['resources'],dict) or not set(row['resources'])<={'prepared','retained','authentication-refused','rate-limited','transport-unavailable','source-unavailable','private-reflection'}
                     or any(type(count) is not int or not 1<=count<=4 for count in row['resources'].values()) or sum(row['resources'].values())>4
@@ -76,5 +77,12 @@ def response(value,action):
                     or any(type(count) is not int or not 0<=count<=32 for count in row['callbacks'].values())
                     or row['snapshot_sha256']!=digest({key:item for key,item in row.items() if key!='snapshot_sha256'})):
                 raise ValueError('exact finite retained A2A source snapshot required')
+    elif action in {'retry-source-auth','purge-source-inputs','purge-task-outputs'}:
+        if (set(value)!={'action','receipt','affected','removed_bytes','message_sent','mission_created'} or value['action']!=action
+                or not isinstance(value['receipt'],str) or not re.fullmatch('[0-9a-f]{64}',value['receipt'])
+                or type(value['affected']) is not int or not 0<=value['affected']<=129
+                or type(value['removed_bytes']) is not int or not 0<=value['removed_bytes']<=65*1024*1024
+                or action=='retry-source-auth' and (not 1<=value['affected']<=4 or value['removed_bytes']!=0)):
+            raise ValueError('finite no-send A2A recovery receipt required')
     else:raise ValueError('unsupported private A2A owner action')
     return value

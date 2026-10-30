@@ -1,0 +1,268 @@
+{
+  "date_utc": "2026-10-30",
+  "parent_commit": "675346e343d73e03789a8bab8079662eb374a3d8",
+  "tested_source_tree_before_this_receipt": "0e8dbbedfa0285d2827d621758aeaf5bd83bad6b",
+  "source_files_sha256": {
+    ".github/workflows/haos-initial-setup.yml": "998c5fb08d92cd2ff605b669cfb481f153df4fb10e2bca27d5e011c67e2064fa",
+    "docs/GATEWAY-A2A.md": "f3b587281074c3f3a482f34c5d2dbefe71e456852952f098bab7e374fadabe01",
+    "linux/haos/haos/a2a_owner_gui.py": "b676a7fa98cca94be3e46579afd9c5ebb706b8ec1c7a4f579028095a2aaa6527",
+    "linux/haos/haos/a2a_owner_process.py": "eb4e47afadb41e3f2f367bc0818e3e1d270c73d7add7a1332c9f07e89b3fad9f",
+    "linux/haos/haos/a2a_owner_records.py": "c3604149e03f508489700ebeff5404da3770fd5358bd4d07858641522da41ace",
+    "linux/haos/haos/a2a_owner_recovery.py": "fac31f54407cd9b68ba750718689625c644fe065fa27a3d95bb0cdf2ef936732",
+    "linux/haos/haos/a2a_owner_setup.py": "59de9887fde9114ad2183cdc91b73e787b2c5e08437f0fa41abf6eab854e707c",
+    "linux/haos/haos/a2a_owner_worker.py": "722a49cb749c57379d6988465867b0a01f350f078cddf9b5bff79c55f09d6203",
+    "linux/haos/haos/gateway_a2a_resources.py": "0a1f4e7e2b360439870dfe147239db636c2bdf40c9d43d68be933698a3b3900a",
+    "linux/haos/haos/initial_setup_gui.py": "01a79b9ceb8624aa648693be18a8830e973fd9ec7eb3c7fdb34efd0945dcd313",
+    "linux/haos/probes/probe_a2a_profile_process.py": "b9bcddbddd024bf235815974c2a09cb0c0f0300e5f55830ddd37b00958edac5f",
+    "linux/haos/runtime/probe_a2a_media.py": "2ad1360df2e5bfa215859bff4099bcf052f9cadf2e301850acb458eefaafa0cf",
+    "linux/haos/runtime/probe_a2a_owner_gui.py": "995e34f86531dd8d22152d464b4ce7ac4e493cda3b395d111cecdd276d08c5a7",
+    "linux/haos/tests/test_a2a_owner_setup.py": "bb5860d542e8b9ee571bf4b3483cb337d351347daa8e259783d47ae0becfcf96"
+  },
+  "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+  "public_gateways": 13,
+  "a2a_public_activation": false,
+  "regression": {
+    "minimal_passed": 2482,
+    "full_passed": 2482,
+    "existing_skips_each": 2,
+    "actual_root_kernel_passed": 172,
+    "logs_sha256": {
+      "minimal": "f7136469012f6120969df515d64ec75af3cb96de367d1949c429c847171de319",
+      "full": "f8b3a6bd5a9a38c39b616d333c23d66663cfe430fd5a5dd0b1ab16c6aefd55c5",
+      "kernel": "5c963b36ea6b8213bf24b0f6058f5873b43c89e3b2a4586c0c3af892e79a664e",
+      "redaction_gate": "ddc1f5c55ef1d8fd1786fa0364d41be6b094cc7467358dabb72fd5ba0ed916dd"
+    }
+  },
+  "actual_installed_UID_controller_TLS_owner_process": {
+    "cases": [
+      "actual_installed_readonly_code_dedicated_gateway_UID_and_verified_TLS_listener",
+      "actual_native_background_status_writer_uses_private_process_launcher_HOME_not_session_override_or_owner_HOME",
+      "actual_other_UID_cannot_read_account_journals_owner_canary_or_modify_code_or_construct_A2A_profile",
+      "actual_controller_Unix_socket_SO_PEERCRED_denies_foreign_UID_even_with_socket_group_access",
+      "actual_loopback_TCP_without_named_peer_token_has_no_A2A_rights",
+      "actual_native_MessageEvent_preserves_wire_client_deduplication_identity_through_retained_parent_relay",
+      "actual_root_controller_checks_expected_owner_grant_epoch_before_mission_admission",
+      "actual_gateway_UID_controller_Unix_admission_and_queue_receipt_do_not_complete_waiting_native_JSON_RPC",
+      "actual_concurrent_gateway_process_cannot_reuse_private_profile_lease",
+      "actual_SIGKILL_reopen_restores_working_native_task_and_replay_does_not_repeat_relay_or_root_mission",
+      "actual_UID_restart_then_complete_multichunk_root_output_commits_exact_native_task_available_over_verified_TLS",
+      "actual_native_CancelTask_uses_root_controller_and_lost_receipt_replay_does_not_repeat_cancellation_or_invent_terminal_task",
+      "actual_controller_terminal_cancellation_event_alone_completes_native_Future_and_JSON_RPC_as_cancelled",
+      "actual_Hermes_WebSocket_request_Controller_question_and_native_input_required_export_only_question_identity",
+      "actual_native_taskId_continuation_answers_exact_numeric_Hermes_question_through_root_without_new_task_mission_or_replayed_answer",
+      "new_wire_message_ID_cannot_reuse_old_question_epoch_or_request_permanent_approval_before_parent_dispatch",
+      "actual_native_continuation_SSE_keeps_original_task_ID_and_once_approval_reaches_exact_numeric_Hermes_request",
+      "actual_clarification_and_approval_same_native_task_Future_and_SSE_receive_final_controller_result_without_new_mission",
+      "actual_closed_Hermes_WebSocket_preserves_unconfirmed_answer_with_owner_action_and_no_automatic_or_new_ID_resend",
+      "actual_A2A_media_create_token_without_separate_kind_flags_cannot_fetch_or_admit_files",
+      "actual_native_A2A_early_SSE_precedes_complete_verified_TLS_file_read_then_four_exact_bytes_cross_real_media_and_controller_Unix_gates",
+      "actual_A2A_URI_capability_stays_private_and_agent_goal_has_only_native_opaque_file_carriers",
+      "actual_A2A_transferred_media_replay_never_refetches_URI_or_creates_second_input_or_mission",
+      "actual_native_CancelTask_during_stalled_TLS_download_commits_root_absence_tombstone_then_closes_reader_and_native_Future_without_creating_mission",
+      "actual_gateway_UID_controller_Unix_request_cannot_admit_original_source_after_root_confirmed_prevention",
+      "actual_UID_profile_restart_retains_pre_admission_cancelled_native_source_and_never_refetches_or_replays_it_into_root_mission",
+      "actual_named_peer_TLS_native_push_config_RPC_uses_owner_destination_and_refuses_other_peer_or_unapproved_URL_without_exposing_signing_key",
+      "actual_installed_gateway_UID_native_callback_builder_HMAC_and_verified_HTTPS_sender_follow_root_outcome_acceptance_with_durable_HTTP_ack_not_recipient_read",
+      "actual_completed_task_SSE_replay_preserves_native_file_Parts_without_second_agent_file_read",
+      "actual_root_export_manifest_preserves_cross_chunk_code_examples_and_only_explicit_real_file_uses_bounded_authenticated_agent_HTTP_reader",
+      "actual_native_Task_file_Parts_and_TLS_artifact_endpoint_deliver_exact_snapshot_only_to_current_named_peer_without_paths_or_credentials",
+      "actual_artifact_download_has_durable_local_write_audit_without_claiming_remote_recipient_read",
+      "actual_TLS_long_UTF8_text_artifact_preserves_every_byte_with_read_only_grant_without_agent_file_export_or_native_response_overflow",
+      "separate_outbound_file_grant_is_required_before_any_root_snapshot_read_or_native_artifact_URL",
+      "actual_native_sixth_turn_anti_loop_rejection_is_never_replayed_by_private_pending_input_recovery_into_a_root_mission",
+      "actual_A2A_HTTPS_401_retains_native_input_and_blocks_automatic_resource_refetch_without_mission",
+      "actual_A2A_HTTPS_429_retains_native_input_and_blocks_automatic_resource_refetch_without_mission",
+      "actual_owner_withdrawal_cancels_stalled_HTTPS_resource_reader_and_native_dispatch_without_partial_media_mission_or_fake_terminal_task",
+      "actual_root_owned_policy_replacement_immediately_closes_gateway_listener_and_retained_peer_authority",
+      "actual_TLS_owner_snapshot_validation_refuses_wrong_peer_server_scope_and_callback_without_private_destination_or_key",
+      "actual_owner_backend_rejects_eight_foreign_UID_actions_before_SDK_and_private_inspection_worker_rejects_root_and_agent_UID",
+      "actual_root_owner_no_send_inspection_drops_to_gateway_UID_and_checks_installed_native_runtime_TLS_and_exclusive_bind_without_external_reachability_claim",
+      "actual_owner_private_UID_readonly_inventory_exposes_retained_tasks_media_auth_refusal_callback_receipts_and_withdrawn_grants_without_raw_URI_keys_or_new_missions",
+      "actual_private_UID_owner_recovery_refuses_active_or_unreconciled_sources_and_never_retries_withdrawn_authentication",
+      "actual_private_UID_atomic_logical_original_purge_preserves_task_and_replay_tombstones_and_idempotently_replays_receipt_after_lost_owner_response",
+      "actual_owner_atomic_output_byte_purge_preserves_completed_task_metadata_and_native_and_root_outcome_receipts_without_recreating_exports",
+      "actual_root_private_UID_authentication_retry_resets_only_unchanged_current_unadmitted_resource_and_persists_idempotent_receipt_without_fetch_or_mission",
+      "actual_root_owner_saved_TLS_and_named_peer_key_reuse_and_exact_context_pairing_publish_real_private_files_fresh_epoch_and_explicit_flags_without_message_or_mission",
+      "actual_root_peer_token_rotation_revokes_all_old_connector_grants_preserves_resource_callback_settings_and_all_historical_task_data_without_credentials_in_owner_audit"
+    ],
+    "passed": 49,
+    "actual_UID_TLS_kernel_flock_SIGKILL_SQLite_reopen": true,
+    "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+    "actual_controller_Unix_socket_SO_PEERCRED": true,
+    "live_peer_inference_public_activation_or_release": false
+  },
+  "actual_native_media_HTTPS_retry_after": {
+    "cases": [
+      "actual_native_inline_file_text_codec_and_FULL_snapshot_then_media_cache_retain_exact_original_bytes_without_HTTP",
+      "actual_verified_TLS_file_read_omits_peer_credentials_and_agent_URL_capability",
+      "real_SQLite_cache_copy_failure_and_reopen_preserve_first_response_without_refetching_changed_URI",
+      "transferred_private_media_replay_preserves_receipt_without_restoring_consumed_cache_bytes_or_refetching",
+      "actual_native_legacy_fileWithUri_codec_preserves_opaque_carrier_and_exact_origin_permission",
+      "native_file_no_custody_or_HTTP_on_invalid_part_0",
+      "native_file_no_custody_or_HTTP_on_invalid_part_1",
+      "native_file_no_custody_or_HTTP_on_invalid_part_2",
+      "native_file_no_custody_or_HTTP_on_invalid_part_3",
+      "native_file_no_custody_or_HTTP_on_invalid_part_4",
+      "native_file_no_custody_or_HTTP_on_invalid_part_5",
+      "native_file_no_custody_or_HTTP_on_invalid_part_6",
+      "native_file_no_custody_or_HTTP_on_invalid_part_7",
+      "native_file_no_custody_or_HTTP_on_invalid_part_8",
+      "native_file_no_custody_or_HTTP_on_invalid_part_9",
+      "native_file_no_custody_or_HTTP_on_invalid_part_10",
+      "native_file_no_custody_or_HTTP_on_invalid_part_11",
+      "explicit_voice_consent_is_independent_of_generic_media_and_no_audio_to_document_downgrade",
+      "actual_HTTPS_401_persists_refusal_backoff_and_does_not_follow_redirect_or_repeat_read",
+      "actual_HTTPS_429_persists_refusal_backoff_and_does_not_follow_redirect_or_repeat_read",
+      "actual_HTTPS_302_persists_refusal_backoff_and_does_not_follow_redirect_or_repeat_read",
+      "actual_truncated_HTTPS_body_never_commits_partial_snapshot_or_media_receipt",
+      "current_owner_withdrawal_precedes_retained_and_cached_attachment_use"
+    ],
+    "passed": 23,
+    "pinned_hermes": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+    "scope": "actual frozen native A2A file/text codecs, verified loopback HTTPS and real private FULL SQLite first-byte/cache recovery; explicit fixture CA trust in this process only",
+    "installed_UID_controller_ASR_model_inference_live_peer_or_public_activation": false
+  },
+  "actual_Tk_with_explicit_privileged_handoff_fixtures": {
+    "a2a-owner-gui-recovery-large": {
+      "passed": 10,
+      "cases": [
+        "actual_Tk_A2A_account_hides_unrelated_token_and_never_loads_saved_peer_or_TLS_keys",
+        "public_identity_change_clears_private_key_and_explicit_show_choice_in_actual_Tk",
+        "actual_Tk_account_save_hands_typed_fields_and_explicit_reuse_to_private_backend_then_refreshes_only_public_metadata",
+        "actual_Tk_no_send_inspection_surfaces_finite_listener_error_without_claiming_external_reachability",
+        "actual_Tk_peer_editor_hands_separate_masked_key_download_origins_and_exact_callback_to_backend_and_clears_private_fields",
+        "actual_Tk_exact_context_edits_reset_all_media_callback_consent_and_unimplemented_native_pause_is_disabled",
+        "actual_Tk_pairing_passes_exact_saved_peer_context_and_separate_flags_then_resets_consent",
+        "actual_Tk_private_history_shows_revoked_account_and_resource_callback_failures_without_keys_and_requests_real_cursor_pages",
+        "actual_Tk_recovery_requires_explicit_review_and_resets_confirmation_on_action_change_then_passes_exact_snapshot_to_backend_fixture",
+        "platform_switch_hides_A2A_fields_and_clears_all_transient_private_material"
+      ],
+      "actual_Tk": true,
+      "screen": [
+        1280,
+        800
+      ],
+      "privileged_handoffs_and_account_responses_are_fixtures": true,
+      "installed_GUI_public_activation_or_external_delivery": false
+    },
+    "a2a-owner-gui-recovery-small": {
+      "passed": 10,
+      "cases": [
+        "actual_Tk_A2A_account_hides_unrelated_token_and_never_loads_saved_peer_or_TLS_keys",
+        "public_identity_change_clears_private_key_and_explicit_show_choice_in_actual_Tk",
+        "actual_Tk_account_save_hands_typed_fields_and_explicit_reuse_to_private_backend_then_refreshes_only_public_metadata",
+        "actual_Tk_no_send_inspection_surfaces_finite_listener_error_without_claiming_external_reachability",
+        "actual_Tk_peer_editor_hands_separate_masked_key_download_origins_and_exact_callback_to_backend_and_clears_private_fields",
+        "actual_Tk_exact_context_edits_reset_all_media_callback_consent_and_unimplemented_native_pause_is_disabled",
+        "actual_Tk_pairing_passes_exact_saved_peer_context_and_separate_flags_then_resets_consent",
+        "actual_Tk_private_history_shows_revoked_account_and_resource_callback_failures_without_keys_and_requests_real_cursor_pages",
+        "actual_Tk_recovery_requires_explicit_review_and_resets_confirmation_on_action_change_then_passes_exact_snapshot_to_backend_fixture",
+        "platform_switch_hides_A2A_fields_and_clears_all_transient_private_material"
+      ],
+      "actual_Tk": true,
+      "screen": [
+        640,
+        480
+      ],
+      "privileged_handoffs_and_account_responses_are_fixtures": true,
+      "installed_GUI_public_activation_or_external_delivery": false
+    },
+    "a2a-owner-gui-dingtalk-regression": {
+      "passed": 16,
+      "cases": [
+        "actual_Tk_masks_private_app_secret_and_hides_unrelated_token",
+        "app_identity_change_clears_private_secret",
+        "exact_app_corporation_robot_and_explicit_reply_mode_reach_owner_handoff_then_secret_clears",
+        "account_inspection_and_auth_recheck_buttons_have_distinct_no_send_handoffs",
+        "actual_Tk_challenge_copy_and_observation_handoff_fill_untrusted_opaque_IDs_without_pairing",
+        "explicit_separate_owner_pairing_carries_exact_IDs_scope_and_default_denied_media_flags",
+        "session_reply_mode_cannot_enable_outbound_artifact_consent",
+        "observation_timeout_is_honest_and_never_creates_a_grant",
+        "platform_switch_clears_private_secret_and_restores_other_platform_thread_field",
+        "every_finite_DingTalk_transport_state_part_and_complete_batch_proof_is_displayed_without_upload_key_or_recipient_read_claim",
+        "no_independent_non_acceptance_checkbox_means_no_owner_retry_handoff",
+        "selected_part_operation_snapshot_and_non_acceptance_confirmation_reach_separate_owner_handoff",
+        "changing_selected_part_clears_confirmation_and_confirmed_parts_are_not_retry_choices",
+        "explicit_source_disposal_carries_exact_profile_kind_and_snapshot_without_returning_raw_bytes",
+        "source_change_resets_confirmation_and_active_grant_cannot_be_purged_even_with_checkbox",
+        "conversion_disposal_requires_explicit_inspection_and_passes_exact_metadata_snapshot"
+      ],
+      "actual_Tk": true,
+      "screen": [
+        1280,
+        800
+      ],
+      "privileged_handoffs_and_account_responses_are_fixtures": true,
+      "public_DingTalk_activation_or_external_delivery": false
+    },
+    "a2a-owner-gui-feishu-regression": {
+      "passed": 14,
+      "cases": [
+        "actual_Tk_Feishu_form_masks_secret_and_hides_unrelated_generic_token",
+        "app_identity_change_clears_private_secret_and_listener_consent",
+        "websocket_owner_handoff_contains_exact_account_without_unused_webhook_secrets",
+        "no_send_account_and_auth_retry_buttons_have_real_separate_owner_handoffs_and_finite_errors",
+        "exact_app_scope_is_derived_and_sender_edit_resets_separate_default_denied_media_consents",
+        "exact_open_ID_chat_topic_and_separate_grants_reach_owner_pairing_then_consents_clear",
+        "webhook_fields_are_real_and_invalid_port_refuses_handoff_while_clearing_all_secrets",
+        "mode_and_platform_switch_clear_secrets_without_secret_in_status_or_labels",
+        "every_finite_Feishu_transport_state_and_distinct_part_acceptance_is_displayed_without_receipt_body",
+        "no_independent_non_acceptance_checkbox_means_no_owner_retry_handoff",
+        "selected_part_operation_snapshot_and_non_acceptance_confirmation_reach_separate_owner_handoff",
+        "changing_selected_part_clears_confirmation_and_confirmed_parts_are_not_retry_choices",
+        "explicit_source_disposal_carries_exact_profile_kind_and_snapshot_without_returning_raw_bytes",
+        "source_change_resets_confirmation_and_active_grant_cannot_be_purged_even_with_checkbox"
+      ],
+      "actual_Tk": true,
+      "screen": [
+        1280,
+        800
+      ],
+      "privileged_handoffs_and_account_responses_are_fixtures": true,
+      "public_Feishu_activation_or_external_delivery": false
+    },
+    "a2a-owner-gui-email-regression": {
+      "passed": 10,
+      "cases": [
+        "actual_prepared_email_form_masks_password_and_hides_generic_bot_token",
+        "endpoint_change_clears_password_and_receiving_server_trust_consent",
+        "invalid_port_is_rejected_before_owner_handoff_and_password_field_is_cleared",
+        "explicit_account_snapshot_and_receiving_server_consent_reach_owner_handoff_without_password_in_labels_or_status",
+        "finite_account_failure_is_displayed_without_claiming_authentication_or_delivery",
+        "authentication_recheck_has_a_real_owner_handoff_and_does_not_send",
+        "email_pairing_binds_exact_sender_reply_address_mailbox_and_explicit_optional_root_thread",
+        "email_media_and_output_default_deny_and_sender_changes_clear_each_consent",
+        "email_pairing_handoff_keeps_exact_route_and_separate_media_permissions_then_clears_consent",
+        "platform_switch_clears_mail_password_and_consent"
+      ],
+      "screen": [
+        1280,
+        800
+      ],
+      "actual_Tk": true,
+      "owner_handoffs_are_fixtures": true,
+      "public_registry_enabled": true,
+      "external_accounts_or_delivery_or_installed_owner_acceptance": false
+    }
+  },
+  "limits": [
+    "GUI fixture privileged account/recovery handoffs are substituted; separate installed-code process fixture exercises actual root/private UID backend.",
+    "Only systemd service-stop boundary is substituted in disposable process fixture; no installed OS service lifecycle acceptance.",
+    "Positive auth reset restores the fixture unchanged saved grant epoch; real new owner grants get fresh epochs and cannot resurrect old sources.",
+    "Logical selected-journal byte removal preserves metadata and replay proofs; no secure erasure or removal of other copies is claimed.",
+    "No live peer, external delivery, real model inference, public activation, hardware or release acceptance."
+  ],
+  "ci_for_parent": {
+    "four_completed_success": [
+      41005850303,
+      41005850313,
+      41005850305,
+      41005850339
+    ],
+    "contracts_still_running_at_check": [
+      41005850328,
+      41005845697
+    ],
+    "not_results_for_this_dirty_source": true
+  }
+}

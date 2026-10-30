@@ -57,7 +57,7 @@ def main():
                 assert not any(token in str(request.headers) for token in value['peer_tokens'].values())
                 calls.append(request.path)
                 if request.path.startswith('/status/'):
-                    return web.Response(status=int(request.path.rsplit('/',1)[1]),headers={'Location':'https://unapproved.invalid/private'})
+                    return web.Response(status=int(request.path.rsplit('/',1)[1]),headers={'Location':'https://unapproved.invalid/private','Retry-After':'137'})
                 if request.path=='/broken':
                     reply=web.StreamResponse(headers={'Content-Type':'image/png','Content-Length':'10000'})
                     await reply.prepare(request);await reply.write(b'partial');request.transport.close();return reply
@@ -134,8 +134,9 @@ def main():
                             assert error.reason in {reason,'transport-unavailable'}
                         else:raise AssertionError('non-200 native A2A file response admitted')
                     assert len(calls)==before+1
-                    row=raw.db.execute('SELECT state,data,media_id FROM a2a_input_resources WHERE raw_id=?',(item['id'],)).fetchone()
-                    assert tuple(row)==(reason,None,'')
+                    row=raw.db.execute('SELECT state,data,media_id,next_attempt,updated_at FROM a2a_input_resources WHERE raw_id=?',(item['id'],)).fetchone()
+                    assert tuple(row)[:3]==(reason,None,'')
+                    if status==429:assert 136<=row['next_attempt']-row['updated_at']<=138
                     cases.append('actual_HTTPS_'+str(status)+'_persists_refusal_backoff_and_does_not_follow_redirect_or_repeat_read')
                 broken=raw.capture(policy(),'a2a',value,'alice',json.dumps(message('broken-file',[{'url':origin+'/broken','filename':'x.png','mediaType':'image/png'}])).encode())
                 try:await resources.retained(broken)
