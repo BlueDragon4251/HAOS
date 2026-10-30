@@ -18,11 +18,14 @@ app.setPath('userData', path.join(fixture, 'profile'))
 const evidence = path.join(fixture, 'evidence')
 fs.mkdirSync(evidence, { mode: 0o700 })
 const deadline = setTimeout(() => app.exit(2), 45000)
+const mark = phase => fs.writeSync(2, `HAOS_GUI_FIXTURE_PHASE ${phase}\n`)
 let browser, server
 
 async function main() {
   try {
+    mark('waiting-for-app')
     await app.whenReady()
+    mark('app-ready')
     const { MissionBrowser } = await import('../dist/electron/gui-broker.mjs')
     browser = new MissionBrowser(true)
     const mission = randomUUID()
@@ -32,7 +35,9 @@ async function main() {
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
     const address = `http://127.0.0.1:${server.address().port}/private-canary`
     const html = `<style>body{margin:0;background:#fff}input{display:block;height:36px;width:300px;margin:10px}#marker{width:80px;height:80px;background:#00cc44}</style><input id="first"><input id="second"><input id="files" type="file"><div id="marker"></div><script>document.body.innerHTML='UNAUTHORIZED SCRIPT';fetch('${address}');new RTCPeerConnection({iceServers:[{urls:'stun:127.0.0.1:12345'}]});alert('Owner dialog');</script><img src="${address}"><a href="file:///etc/shadow">private file</a>`
+    mark('opening-first-document')
     const opened = await execute({ operation: 'open', html })
+    mark('first-document-open')
     const window = opened.window
     assert.deepEqual(await execute({ operation: 'state' }), { windows: [opened] })
     const win = BrowserWindow.getAllWindows()[0]
@@ -70,7 +75,9 @@ async function main() {
     assert.equal(prefs.preload, undefined)
     let choosers = 0
     win.webContents.debugger.on('message', (_event, method) => { if (method === 'Page.fileChooserOpened') choosers++ })
+    mark('capturing-first-document')
     const first = await execute({ operation: 'capture', window })
+    mark('first-capture-complete')
     await execute({ operation: 'click', window, x: 80, y: 70 })
     await execute({ operation: 'type', window, text: 'Real GUI input 4251' })
     await execute({ operation: 'key', window, key: 'Tab' })
