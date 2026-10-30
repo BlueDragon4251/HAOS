@@ -10,10 +10,13 @@ from .gateway_buzz_crypto import wire,verify
 
 
 class Refused(PermissionError):
-    def __init__(self,reason):
-        if reason not in {'unapproved-route','unsupported-content','invalid-time','private-reflection','independent-media-consent-required','mention-required'}:
+    def __init__(self,reason,retry_after=0):
+        if (reason not in {'unapproved-route','unsupported-content','invalid-time','private-reflection','independent-media-consent-required','mention-required',
+                'unapproved-resource-origin','independent-decoded-media-consent-required','resource-mime-mismatch','resource-rate-limited',
+                'resource-authentication-or-content-refused','resource-unavailable','resource-size-refused','resource-integrity-refused','aggregate-image-budget','media-command-refused'}
+                or type(retry_after) is not int or not 0<=retry_after<=86400):
             raise ValueError('finite Buzz source refusal required')
-        super().__init__('Buzz source refused; inspect its exact sender context and owner permission');self.reason=reason
+        super().__init__('Buzz source refused; inspect its exact sender context and owner permission');self.reason=reason;self.retry_after=retry_after
 
 
 def thread(event):
@@ -40,6 +43,8 @@ async def approve(policy,connector,value,raw,redactor,*,received_at=None,own_rep
     from plugins.platforms.buzz.adapter import BuzzAdapter,_find_relay_media_refs
     attachments,rejected=BuzzAdapter._parse_imeta_attachments(event)
     references,_=_find_relay_media_refs(event['content'],value['relay_url'])
+    imeta_urls={item['url'] for item in attachments}
+    references=[url for url in references if url not in imeta_urls]
     if rejected or len(attachments)+len(references)>4:raise Refused('unsupported-content')
     text=event['content'] or ('[Buzz attachment]' if attachments or references else '')
     if not text or redactor.text(text)!=text:raise Refused('private-reflection' if text else 'unsupported-content')
@@ -57,14 +62,19 @@ async def approve(policy,connector,value,raw,redactor,*,received_at=None,own_rep
             parent=_event_reply_parent_id(event)
             addressed=bool(parent and own_reply(channels[0],parent) is True)
         if not addressed:raise Refused('mention-required')
-    from .gateway_media import approved,MAX_BYTES
+    from .gateway_media import approved,MAX_BYTES,MAX_IMAGE_BYTES
     resources=[]
+    from .gateway_buzz import resource_origin
     for index,item in enumerate(attachments):
-        mime=item['mime_type'];kind='voice' if mime.startswith('audio/') else 'video' if mime.startswith('video/') else 'image' if mime.startswith('image/') else 'document'
-        if item['size']>MAX_BYTES:raise Refused('unsupported-content')
+        try:resource_origin(value,item['url'])
+        except (PermissionError,ValueError):raise Refused('unapproved-resource-origin') from None
+        mime=item['mime_type'].split(';',1)[0].strip().lower();kind='voice' if mime.startswith('audio/') else 'video' if mime.startswith('video/') else 'image' if mime.startswith('image/') else 'document'
+        if item['size']>MAX_BYTES or kind=='image' and item['size']>MAX_IMAGE_BYTES:raise Refused('unsupported-content')
         if not approved(binding,kind):raise Refused('independent-media-consent-required')
         resources.append({'index':index,'mode':'imeta','kind':kind,**item})
     for url in references:
+        try:resource_origin(value,url)
+        except (PermissionError,ValueError):raise Refused('unapproved-resource-origin') from None
         if not any(binding.get(key) is True for key in ['allow_media','allow_voice','allow_video']):raise Refused('independent-media-consent-required')
         resources.append({'index':len(resources),'mode':'relay-ref','url':url})
     checked=await verify(raw)

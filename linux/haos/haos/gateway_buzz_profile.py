@@ -14,6 +14,7 @@ from .gateway_buzz_cache import RawEvents
 from .gateway_buzz_history import History
 from .gateway_buzz_ingress import install,capture,dispatch_stored
 from .gateway_buzz_socket import Transport
+from .gateway_buzz_admission import Refused
 
 STATES=frozenset({'created','connecting','connected-ws','connected-poll','disconnected','closed','revoked',
     'authentication-refused','identity-refused','rate-limited','transport-unavailable','source-unavailable','storage-unavailable'})
@@ -179,6 +180,8 @@ def _lifecycle(adapter,lease,identity):
                         and not native.inbox.db.execute("SELECT 1 FROM native_inbox WHERE connector=? AND state='failed'",(native.connector,)).fetchone()):
                     status('connected-ws' if any(connection.authenticated for connection in transport.connections) else 'connected-poll')
             except asyncio.CancelledError:raise
+            except Refused as error:
+                check();status('rate-limited' if error.reason=='resource-rate-limited' else 'source-unavailable',error.retry_after or 2)
             except PermissionError:
                 # A media source deliberately remains pending, never downgraded
                 # into text by this unfinished private text profile.

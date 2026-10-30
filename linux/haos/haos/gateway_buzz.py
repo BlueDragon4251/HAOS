@@ -35,7 +35,7 @@ def channel(value):
 
 def credentials(value):
     fields={'private_key','public_key','relay_url','channels'}
-    if not isinstance(value,dict) or not fields<=set(value)<=fields|{'auth_tag'}:
+    if not isinstance(value,dict) or not fields<=set(value)<=fields|{'auth_tag','attachment_origins'}:
         raise ValueError('dedicated private Nostr key, expected public key, exact relay and explicit channels required')
     key=value['private_key'];public=value['public_key']
     if (not isinstance(public,str) or not HEX.fullmatch(public) or not isinstance(key,str)
@@ -47,6 +47,13 @@ def credentials(value):
         raise ValueError('one to thirty-two explicit distinct Buzz channel UUIDs required')
     for item in channels:channel(item)
     result={**value,'channels':sorted(channels)}
+    if 'attachment_origins' in value:
+        origins=value['attachment_origins']
+        if (not isinstance(origins,list) or len(origins)>8 or any(not isinstance(item,str) for item in origins)
+                or len(set(origins))!=len(origins)):
+            raise ValueError('at most eight explicit distinct HTTPS attachment origins required')
+        for item in origins:relay(item)
+        result['attachment_origins']=sorted(origins)
     if 'auth_tag' in value:
         raw=value['auth_tag']
         if not isinstance(raw,str) or len(raw.encode())>4096:raise ValueError('bounded private NIP-OA auth tag JSON required')
@@ -61,6 +68,25 @@ def credentials(value):
 
 
 def scope(value):return 'buzz:'+digest([value['relay_url'],value['public_key']])
+
+
+def resource_origin(value,url):
+    """No credential-bearing GET beyond the native relay's media namespace."""
+    if (not isinstance(url,str) or not 1<=len(url)<=4096 or any(ord(c)<33 or ord(c)>126 for c in url) or '\\' in url):
+        raise ValueError('one bounded explicit HTTPS resource URL required')
+    try:parts=urlsplit(url);host=parts.hostname;port=parts.port
+    except ValueError:raise ValueError('invalid Buzz resource URL') from None
+    if parts.scheme!='https' or not host or parts.username is not None or parts.password is not None or parts.fragment or '#' in url:
+        raise ValueError('Buzz resource cannot contain ambient credentials or a fragment')
+    authority='['+host+']' if ':' in host else host
+    if port is not None and port!=443:authority+=':'+str(port)
+    origin=relay(urlunsplit(('https',authority,'','','')))
+    if origin==value['relay_url']:
+        if not re.fullmatch('/media/[0-9a-f]{64}(?:\\.[a-z0-9]{1,8}|\\.thumb\\.jpg)?',parts.path):
+            raise PermissionError('private relay credentials are restricted to native content-addressed media GETs')
+        return 'relay'
+    if origin not in value.get('attachment_origins',[]):raise PermissionError('foreign media origin lacks explicit independent owner approval')
+    return 'public'
 
 
 def validate_binding(binding):

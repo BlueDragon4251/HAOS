@@ -26,6 +26,10 @@ def main():
     staged=Path(tempfile.mkdtemp(prefix='haos-buzz-public-source-'))
     shutil.copytree(prepared,staged,dirs_exist_ok=True,ignore=shutil.ignore_patterns('.git','.venv','__pycache__','.env','auth.json','config.yaml'))
     subprocess.run([sys.executable,installer,str(staged),str(code/'hermes-source')],check=True)
+    model=Path('/var/lib/haos-speech-models/buzz-fixture');model.parent.mkdir(mode=0o755,parents=True,exist_ok=True)
+    shutil.copytree('/public-model',model)
+    model.chmod(0o755)
+    for path in model.rglob('*'):path.chmod(0o755 if path.is_dir() else 0o644)
     with Path('/etc/passwd').open('a') as stream:stream.write('haos-gateway:x:65534:65534:Disposable gateway:/nonexistent:/usr/sbin/nologin\n')
     with Path('/etc/group').open('a') as stream:stream.write('haos-gateway:x:65534:\n')
     target=code/'buzz';target.mkdir(mode=0o755);provenance=json.loads(Path('/public-build/source.json').read_text())
@@ -140,6 +144,108 @@ adapter.send_reaction=no_reaction
 transport=Transport(value,current,capture);adapter._open_websocket=transport.open
 async def exercise():
     try:
+        if sys.argv[1].startswith('media'):
+            fixture=json.loads(Path(sys.argv[2]).read_text())
+            profiles=base/'media-profiles';profiles.mkdir(mode=0o700,exist_ok=True)
+            local=NativeInbox(base/'media-native.db',redactor);parent=RelayInbox(base/'media-parent.db',redactor)
+            profile=build_profile(value,parent=profiles,connector='buzz',policy=current,inbox=local)
+            from haos.gateway_media_relay import MediaCache,event_media
+            from haos.gateway_runtime import adapter_envelope
+            cache=MediaCache(local);accepted=[]
+            def admit(event):
+                envelope=adapter_envelope(event,'buzz');ids=event_media(event,'buzz')
+                assert event.raw_message is None and ids and len(ids)==len(set(ids))
+                rows=[cache.get(current(),identity) for identity in ids]
+                assert all(row['envelope_digest']==digest(envelope) for row in rows)
+                parent.admit(current(),'buzz',envelope,media=ids)
+                accepted.append({'goal':event.text,'type':event.message_type.value,'kinds':[row['descriptor']['kind'] for row in rows]});return True
+            profile.set_durable_message_handler(admit);profile.set_message_handler(admit)
+            try:
+                # This media component fixture drives the real installed native
+                # decoder directly. The full connection/replay lifecycle is
+                # separately exercised below, without substituting UID or I/O.
+                profile._display_name='Own Fixture'
+                name='media-cache-fail' if sys.argv[1]=='media-cache-recover' else 'media-cache-damage' if sys.argv[1]=='media-cache-damage-replay' else sys.argv[1]
+                selected=fixture[name]
+                if name=='media-unapproved':
+                    assert await capture_ingress(profile,value['channels'][0],selected) is False
+                    print(json.dumps({'capture_refused':True}),flush=True);return
+                assert await capture_ingress(profile,value['channels'][0],selected)
+                proof=await profile._haos_buzz_raw.capture(current(),'buzz',value,json.dumps(selected).encode());key=proof['source_key']
+                if name=='media-cache-fail' and sys.argv[1]!='media-cache-recover':
+                    local.db.execute("CREATE TRIGGER fail_media_blob BEFORE INSERT ON native_media_cache BEGIN SELECT RAISE(ABORT,'fixture first blob failure'); END")
+                if sys.argv[1]=='media-cache-damage':
+                    parent.db.execute("CREATE TRIGGER fail_media_parent BEFORE INSERT ON inbox BEGIN SELECT RAISE(ABORT,'fixture parent admission failure'); END")
+                if sys.argv[1]=='media-cache-damage-replay':
+                    identity=local.db.execute('SELECT upload_id FROM buzz_input_media WHERE input_id=?',(key,)).fetchone()[0]
+                    blob=bytearray(local.db.execute('SELECT data FROM native_media_cache WHERE id=?',(identity,)).fetchone()[0]);blob[-1]^=1
+                    local.db.execute('UPDATE native_media_cache SET data=? WHERE id=?',(bytes(blob),identity))
+                try:result=await dispatch_stored(profile,key)
+                except Refused as error:
+                    assert name in {'media-badsha','media-command','media-voice-masked-denied'}
+                    expected='resource-integrity-refused' if name=='media-badsha' else 'media-command-refused' if name=='media-command' else 'independent-decoded-media-consent-required'
+                    assert error.reason==expected
+                    print(json.dumps({'refused':expected}),flush=True);return
+                except Conflict:
+                    assert sys.argv[1]=='media-cache-damage-replay'
+                    print(json.dumps({'damaged_cache_refused':True}),flush=True);return
+                except Exception as error:
+                    import sqlite3
+                    assert isinstance(error,sqlite3.IntegrityError)
+                    if sys.argv[1]=='media-cache-damage':
+                        parent.db.execute('DROP TRIGGER fail_media_parent')
+                        print(json.dumps({'cache_precedes_parent':True}),flush=True);return
+                    assert name=='media-cache-fail' and sys.argv[1]!='media-cache-recover'
+                    assert local.db.execute('SELECT COUNT(*) FROM buzz_input_media WHERE input_id=?',(key,)).fetchone()[0]==1
+                    local.db.execute('DROP TRIGGER fail_media_blob')
+                    print(json.dumps({'receipt_precedes_blob':True}),flush=True);return
+                assert result and accepted and len(accepted)==1
+                before=local.db.execute('SELECT COUNT(*) FROM native_media_cache').fetchone()[0]
+                assert await dispatch_stored(profile,key) and len(accepted)==1
+                assert local.db.execute('SELECT COUNT(*) FROM native_media_cache').fetchone()[0]==before
+                if sys.argv[1]=='media-voice':
+                    from haos.store import MissionStore
+                    from haos.controller import Controller
+                    from haos import speech,speech_client
+                    from haos.gateway_media_relay import forward
+                    from websockets.asyncio.server import serve
+                    store=MissionStore(base/'buzz-voice-controller.db');controller=Controller(store,'unused',set());controller.gateway_policy=current
+                    saved=speech_client.transcribe;asr=[];methods=[];prompts=[]
+                    async def local_engine(data,current):
+                        current();asr.append(len(data))
+                        result=await asyncio.to_thread(speech.transcribe,data,model_root=Path('/var/lib/haos-speech-models/buzz-fixture'),model_owner_uid=0)
+                        current();return result
+                    speech_client.transcribe=local_engine
+                    async def terminal(connection):
+                        async for raw in connection:
+                            request=json.loads(raw);method=request['method'];methods.append(method)
+                            if method=='session.create':result={'session_id':'buzz-voice','stored_session_id':'buzz-voice-durable'}
+                            elif method=='prompt.submit':
+                                text=request['params']['text'];assert 'ask not what your country can do for you' in text.lower()
+                                assert '@file:' not in text and 'data:' not in text and value['relay_url'] not in text
+                                prompts.append(text);result={'status':'streaming'}
+                            else:raise AssertionError('raw Buzz voice reached agent RPC')
+                            await connection.send(json.dumps({'jsonrpc':'2.0','id':request['id'],'result':result}))
+                            if method=='prompt.submit':await connection.send(json.dumps({'method':'event','params':{'type':'message.complete','session_id':'buzz-voice',
+                                'payload':{'status':'complete','text':'Protocol terminal fixture, no inference'}}}))
+                    try:
+                        pending=parent.db.execute("SELECT * FROM inbox WHERE json_extract(envelope,'$.message_id')=?",(selected['id'],)).fetchone()
+                        envelope=json.loads(pending['envelope']);ids=json.loads(pending['media'])
+                        async def call(method,params):return await controller.gateway_dispatch({'method':method,'params':params})
+                        admitted=await forward(current,'buzz',envelope,ids,cache,call);mid=admitted['mission_id']
+                        parent.admitted(pending['id'],mid);cache.transferred(ids)
+                        async with serve(terminal,'127.0.0.1',0) as endpoint:
+                            controller.url='ws://127.0.0.1:'+str(endpoint.sockets[0].getsockname()[1]);mission=store.claim();assert mission['id']==mid
+                            await asyncio.wait_for(controller.execute(mission),30)
+                        assert store.get(mid)['state']=='completed' and len(asr)==1 and len(prompts)==1 and methods==['session.create','prompt.submit']
+                        transcript=controller.gateway.media.transcript(current(),mid,ids[0])
+                        assert 'ask what you can do for your country' in transcript['transcript'].lower()
+                        assert await dispatch_stored(profile,key) and len(asr)==1 and len(store.list())==1
+                    finally:speech_client.transcribe=saved;store.close()
+                print(json.dumps({'media_admitted':accepted[0],'resource_count':len(proof['resources']),'same_source_replay':True,
+                    'actual_local_ASR':sys.argv[1]=='media-voice'}),flush=True)
+            finally:await profile.close_profile();local.close();parent.close()
+            return
         if sys.argv[1].startswith('outbox'):
             profiles=base/'outbox-profiles';profiles.mkdir(mode=0o700,exist_ok=True)
             local=NativeInbox(base/'outbox-native.db',redactor);parent=RelayInbox(base/'outbox-parent.db',redactor)
@@ -406,11 +512,20 @@ except PermissionError as error:
     cases=['actual_root_agent_UID_and_gateway_with_supplementary_root_group_are_refused_before_optional_native_SDK_import_or_credential_parsing_in_private_profile_factory']
     async def exercise():
         from aiohttp import web
-        mode={'name':'receive'};auths=[];subscriptions=[];escapes=[];active=[];queries=[];query_auth=[];outgoing=[];write_auth=[]
+        mode={'name':'receive'};auths=[];subscriptions=[];escapes=[];active=[];queries=[];query_auth=[];outgoing=[];write_auth=[];assets={};media_gets=[];public_gets=[]
         def verified(event):
             result=subprocess.run([str(target/'haos-buzz-verify')],input=json.dumps(event),text=True,capture_output=True,timeout=5)
             assert result.returncode==0 and json.loads(result.stdout)['valid'] is True
         async def handle(request):
+            if request.path.startswith('/media/'):
+                assert request.method=='GET' and request.path in assets
+                header=request.headers['Authorization'];assert header.startswith('Nostr ')
+                encoded=header[6:];auth=json.loads(base64.urlsafe_b64decode(encoded+'='*((-len(encoded))%4)));verified(auth)
+                tags={tag[0]:tag[1] for tag in auth['tags'] if len(tag)==2}
+                assert auth['kind']==24242 and auth['pubkey']==public and auth['content']=='Get media'
+                assert tags['t']=='get' and tags['server']=='localhost:'+str(port) and 0<int(tags['expiration'])-auth['created_at']<=60
+                assert scalar not in header and not request.headers.get('Cookie')
+                media_gets.append(request.path);return web.Response(body=assets[request.path])
             if request.path in {'/query','/events'}:
                 body=await request.read();header=request.headers['Authorization'];assert header.startswith('Nostr ')
                 auth=json.loads(base64.b64decode(header[6:],validate=True));verified(auth)
@@ -478,7 +593,8 @@ except PermissionError as error:
         def spawn(name):
             return subprocess.Popen([sys.executable,str(script),name,str(root/'signed-inputs.json')],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,
                 text=True,user=65534,group=65534,extra_groups=[],cwd='/',env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8',
-                    'PYTHONPATH':str(code)+':'+str(code/'hermes-source')+':/sdk','SSL_CERT_FILE':str(root/'ca.pem'),'HERMES_SAFE_MODE':'1'})
+                    'PYTHONPATH':str(code)+':'+str(code/'hermes-source')+':/sdk','SSL_CERT_FILE':str(root/'ca.pem'),'HERMES_SAFE_MODE':'1',
+                    'OMP_NUM_THREADS':'2','OPENBLAS_NUM_THREADS':'1','HF_HUB_OFFLINE':'1','TRANSFORMERS_OFFLINE':'1'})
         async def done(process):
             await asyncio.wait_for(asyncio.to_thread(process.wait),15);error=process.stderr.read()
             assert process.returncode==0,error
@@ -579,6 +695,72 @@ except PermissionError as error:
             assert await line(process)=={'withdrawal_refused':True};await done(process)
             assert len(subscriptions)==before
             cases.append('actual_root_owned_policy_replacement_prevents_further_use_of_existing_authenticated_socket')
+            png=base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jXioAAAAASUVORK5CYII=')
+            document=b'Bounded local native Buzz document'
+            voice=Path('/public-media/reference.flac').read_bytes()
+            assert hashlib.sha256(voice).hexdigest()=='63a4b1e4c1dc655ac70961ffbf518acd249df237e5a0152faae9a4a836949715'
+            for data,ext in [(png,'png'),(document,'bin'),(voice,'flac')]:assets['/media/'+hashlib.sha256(data).hexdigest()+'.'+ext]=data
+            with socket.socket() as chosen:chosen.bind(('127.0.0.1',0));public_port=chosen.getsockname()[1]
+            async def public_asset(request):
+                assert request.secure and request.path=='/public.png' and not any(request.headers.get(key) for key in ['Authorization','Cookie','x-auth-tag'])
+                public_gets.append(request.path);return web.Response(body=png)
+            public_app=web.Application();public_app.router.add_get('/public.png',public_asset)
+            public_runner=web.AppRunner(public_app,access_log=None);await public_runner.setup()
+            await web.TCPSite(public_runner,'127.0.0.1',public_port,ssl_context=tls).start()
+            try:
+                public_origin='https://localhost:'+str(public_port)
+                account.write_text(json.dumps({**value,'attachment_origins':[public_origin]}));account.chmod(0o600)
+                media_grant={**grant,'allow_media':True,'allow_voice':True,'allow_video':True,'generation':'c'*64,'since':(int(time.time())-5)*1000}
+                publish({**config,'bindings':[media_grant],'publication':'c'*64})
+                png_url=value['relay_url']+'/media/'+hashlib.sha256(png).hexdigest()+'.png'
+                def imeta(data,url,mime):return ['imeta','url '+url,'x '+hashlib.sha256(data).hexdigest(),'size '+str(len(data)),'m '+mime,'filename attachment.bin']
+                voice_url=value['relay_url']+'/media/'+hashlib.sha256(voice).hexdigest()+'.flac'
+                inputs=json.loads(fixture.read_text());inputs.update({
+                    'media-image':signed(peer_scalar,'![fixture]('+png_url+')',tags=[['h',channel],['p',public],imeta(png,png_url,'image/png')]),
+                    'media-document':signed(peer_scalar,'Inspect document '+value['relay_url']+'/media/'+hashlib.sha256(document).hexdigest()+'.bin'),
+                    'media-voice':signed(peer_scalar,'Listen to this fixture',tags=[['h',channel],['p',public],imeta(voice,voice_url,'audio/flac')]),
+                    'media-public':signed(peer_scalar,'Inspect external fixture',tags=[['h',channel],['p',public],imeta(png,public_origin+'/public.png','image/png')]),
+                    'media-cache-fail':signed(peer_scalar,'Retain image before blob insertion',tags=[['h',channel],['p',public],imeta(png,png_url,'image/png')]),
+                    'media-cache-damage':signed(peer_scalar,'Reject damaged retained bytes',tags=[['h',channel],['p',public],imeta(png,png_url,'image/png')]),
+                    'media-badsha':signed(peer_scalar,'Reject changed resource',tags=[['h',channel],['p',public],['imeta','url '+png_url,'x '+('a'*64),'size '+str(len(png)),'m image/png']]),
+                    'media-command':signed(peer_scalar,'/status '+png_url)})
+                fixture.write_text(json.dumps(inputs));fixture.chmod(0o644)
+                for name,goal,kind in [('media-image','fixture','image'),('media-document','Inspect document','document'),
+                        ('media-voice','Listen to this fixture','voice'),('media-public','Inspect external fixture','image')]:
+                    mode['name']=name;before=len(media_gets);before_public=len(public_gets);process=spawn(name)
+                    result=await line(process);await done(process)
+                    assert result=={'media_admitted':{'goal':goal,'type':'photo' if kind=='image' else kind,'kinds':[kind]},'resource_count':1,'same_source_replay':True,'actual_local_ASR':name=='media-voice'},result
+                    assert len(media_gets)==before+(name!='media-public') and len(public_gets)==before_public+(name=='media-public')
+                cases.append('actual_gateway_UID_original_signature_media_grant_native_imeta_and_bare_URL_decoding_preserve_image_document_and_voice_kinds_with_private_FULL_cache_and_parent_media_ids')
+                cases.append('same_relay_private_media_uses_actual_Blossom_signer_while_explicit_foreign_TLS_origin_receives_no_authentication_and_duplicate_imeta_body_URL_is_one_resource')
+                cases.append('actual_gateway_UID_native_voice_media_controller_composition_and_pinned_offline_ASR_reach_only_text_agent_terminal_without_raw_audio_and_replay_creates_no_new_ASR_or_mission_with_private_IPC_and_terminal_fixture_seams')
+                mode['name']='media-cache-fail';before=len(media_gets);process=spawn('media-cache-fail')
+                assert await line(process)=={'receipt_precedes_blob':True};await done(process);assert len(media_gets)==before+1
+                await asyncio.sleep(2.1);process=spawn('media-cache-recover');result=await line(process);await done(process)
+                assert result['media_admitted']['kinds']==['image'] and result['same_source_replay'] is True and len(media_gets)==before+2
+                cases.append('actual_SQL_blob_insertion_failure_keeps_first_byte_receipt_then_new_private_process_refetches_only_exact_original_hash_MIME_and_descriptor_before_native_admission')
+                for name,reason,count in [('media-badsha','resource-integrity-refused',1),('media-command','media-command-refused',0)]:
+                    mode['name']=name;before=len(media_gets);process=spawn(name)
+                    assert await line(process)=={'refused':reason};await done(process);assert len(media_gets)==before+count
+                cases.append('actual_private_resource_hash_mismatch_never_reaches_parent_and_media_control_command_is_refused_before_spending_network_credentials')
+                mode['name']='media-cache-damage';before=len(media_gets);process=spawn('media-cache-damage')
+                assert await line(process)=={'cache_precedes_parent':True};await done(process);assert len(media_gets)==before+1
+                await asyncio.sleep(2.1);process=spawn('media-cache-damage-replay')
+                assert await line(process)=={'damaged_cache_refused':True};await done(process);assert len(media_gets)==before+1
+                cases.append('actual_damaged_retained_media_after_parent_commit_failure_is_refused_on_private_process_reopen_without_refetch_or_automatic_restoration')
+                denied={**media_grant,'allow_voice':False,'generation':'d'*64,'since':(int(time.time())-5)*1000}
+                publish({**config,'bindings':[denied],'publication':'d'*64})
+                inputs=json.loads(fixture.read_text());inputs.update({
+                    'media-voice-masked-denied':signed(peer_scalar,'Not a document downgrade',tags=[['h',channel],['p',public],imeta(voice,voice_url,'application/octet-stream')]),
+                    'media-unapproved':signed(peer_scalar,'No implicit foreign origin',tags=[['h',channel],['p',public],imeta(png,'https://never.fixture.invalid/private.png','image/png')])})
+                fixture.write_text(json.dumps(inputs));fixture.chmod(0o644)
+                before=len(media_gets);process=spawn('media-voice-masked-denied')
+                assert await line(process)=={'refused':'independent-decoded-media-consent-required'};await done(process);assert len(media_gets)==before+1
+                cases.append('actual_voice_bytes_labeled_octet_stream_never_become_document_media_or_reach_ASR_or_parent_when_only_general_media_is_approved')
+                before=len(media_gets)+len(public_gets);process=spawn('media-unapproved')
+                assert await line(process)=={'capture_refused':True};await done(process);assert len(media_gets)+len(public_gets)==before
+                cases.append('signed_foreign_media_origin_without_explicit_owner_approval_is_refused_before_original_admission_or_any_HTTP_credentials')
+            finally:await public_runner.cleanup()
         finally:
             for connection in active:await connection.close()
             await runner.cleanup()

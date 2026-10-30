@@ -27,5 +27,6 @@
   "HTTP_response_body_limits": {"success":8388608,"error":65536,"encoding":"strict UTF-8","scope":"actual CLI handle_response header and decoded chunk bounds"},
   "prepublish_guard": "HAOS_BUZZ_APPROVAL_SOCKET-v1: bounded signed original plus one-byte approval before native message submission",
   "signed_replay": "HAOS_BUZZ_REPLAY_FD-v1: bounded SDK-verified original from inherited descriptor, exact own identity, same prepublication guard, no new signature",
+  "native_media_body_limit": "8388608 bytes before allocation, scoped native request/connect deadlines, bounded native error handler, actual Blossom signer unchanged",
   "maximum_glibc": "2.36"
 }

@@ -66,6 +66,37 @@ def prepare(source,overlay):
     response=response.replace('(&self, resp: reqwest::Response)','(&self, mut resp: reqwest::Response)')
     response=response.replace(body_anchor,body_patch).replace('Ok(resp.text().await?)','Ok(body)')
     patched=patched[:response_start]+response+patched[response_end:]
+    media_start=patched.index('    pub async fn download_media(&self, input: &str) -> Result<bytes::Bytes, CliError> {')
+    media_end=patched.index('\n    }\n',media_start)+len('\n    }')
+    media=patched[media_start:media_end]
+    media_anchor='''                if !resp.status().is_success() {
+                    let status = resp.status().as_u16();
+                    let body = resp.text().await.unwrap_or_default();
+                    return Err(CliError::Relay { status, body });
+                }
+                resp.bytes().await.map_err(CliError::Network)'''
+    if (media.count(media_anchor)!=1 or media.count('.timeout(Duration::from_secs(120))')!=1
+            or media.count('let resp = self')!=1):raise ValueError('pinned Buzz private media GET changed')
+    media=media.replace('let resp = self','let mut resp = self').replace('.timeout(Duration::from_secs(120))',
+        '.timeout(env_duration_secs("BUZZ_TIMEOUT_SECS", 30))\n            .connect_timeout(env_duration_secs("BUZZ_CONNECT_TIMEOUT_SECS", 15))')
+    media_patch='''                if !resp.status().is_success() {
+                    self.handle_response(resp).await?;
+                    return Err(CliError::Other("invalid media response status".into()));
+                }
+                let limit: usize = 8 * 1024 * 1024;
+                if resp.content_length().map(|length| length > limit as u64).unwrap_or(false) {
+                    return Err(CliError::Other("media_response_limit".into()));
+                }
+                let mut data = Vec::new();
+                while let Some(chunk) = resp.chunk().await? {
+                    if chunk.len() > limit - data.len() {
+                        return Err(CliError::Other("media_response_limit".into()));
+                    }
+                    data.extend_from_slice(&chunk);
+                }
+                Ok(bytes::Bytes::from(data))'''
+    media=media.replace(media_anchor,media_patch)
+    patched=patched[:media_start]+media+patched[media_end:]
     query=messages.read_text();query_anchor='    if let Some(s) = since {\n        filter["since"] = serde_json::json!(s);\n    }\n\n    let resp = client.query(&filter).await?;'
     if query.count(query_anchor)!=1:raise ValueError('pinned Buzz message query cursor changed')
     query_patch=query_anchor.replace('    let resp = client.query(&filter).await?;', '    // HAOS private history supplies the relay\'s existing composite cursor.\n    // It is read-only, scoped to this process and still uses the exact channel.\n    if let Ok(before_id) = std::env::var("HAOS_BUZZ_BEFORE_ID") {\n        validate_hex64(&before_id)?;\n        if before.is_none() {\n            return Err(CliError::Usage("composite history cursor requires its exact timestamp".into()));\n        }\n        filter["before_id"] = serde_json::json!(before_id);\n    }\n    let resp = client.query(&filter).await?;')

@@ -230,3 +230,43 @@ bytes before accepting HTTP. These are local relay acceptance receipts; they
 do not prove recipient reads, live external delivery or full controller/owner
 handoff integration. Minimal/full regressions each pass 2,551 tests with the same
 two existing skips. Buzz remains private at 14/22 public software gateways.
+
+## Retained incoming media and real local ASR (still private)
+
+The native media GET uses Blossom kind 24242 (`t=get`, server and expiry), not
+NIP-98. Its actual CLI signer is preserved. A further exact-source overlay bounds
+binary success bodies to 8 MiB before allocation and uses the scoped native
+request/connect deadlines; errors use the bounded common handler. Seven actual
+CLI/TLS/Blossom cases verify signatures, binary bytes, redirects, declared and
+chunked limits, definite 401, exactly three read retries and partial-body loss.
+
+Signed source admission now distinguishes the relay's content-addressed media
+namespace from up to eight explicitly approved foreign HTTPS origins. Private
+identity is never sent to a foreign media origin; anonymous fetches use the
+installed system CA, no ambient proxy/authentication, no redirects and bounded
+bytes/deadline. An imeta URL repeated in the body is one resource. Separate
+media/voice/video checks apply to actual byte classification, so an audio object
+labeled as a generic file does not become a document capability.
+
+Before download/dispatch, the first actual native mention/media-text projection
+is retained. FULL first-byte resource receipts precede private blob insertion;
+reopen may fill a genuinely missing insertion only with the same anchored hash,
+MIME and descriptor. Existing damaged cache bytes are refused without refetch or
+restoration. Native imeta and bare-reference handling receive only independently
+retained opaque resources, then MessageEvents carry private media IDs rather
+than host paths. Media control commands fail before credential spending.
+
+Thirty-five installed-UID/native-process cases pass, including PNG, document and
+voice admission, anonymous approved foreign TLS media, exact resource replay,
+real SQL blob/parent failures and corruption, unapproved origins and voice
+disguised as a document. The voice path composes the actual decoder, private
+cache, controller functions and pinned offline ASR under the gateway UID with a
+root-owned model. The expected speech reaches a text-only protocol terminal;
+replay does not retranscribe or create another mission. Private speech IPC and
+the terminal are explicit fixture seams, not an installed speech-service or
+provider inference acceptance.
+
+Minimal/full regressions each pass 2,565 tests with the same two existing skips;
+172 actual root/kernel cases pass. Public factory activation, media outputs,
+real owner UID/GUI recovery, production controller process integration and
+packaging/CI remain separate unfinished work. The public count remains 14/22.

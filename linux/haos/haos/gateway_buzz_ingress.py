@@ -4,6 +4,7 @@ import copy
 from contextvars import ContextVar
 from datetime import datetime,timezone
 import json
+import time
 from types import MethodType,SimpleNamespace
 
 from .gateway import Conflict,digest
@@ -11,6 +12,42 @@ from .gateway_buzz import scope
 from .gateway_buzz_admission import Refused,thread
 
 _CURRENT=ContextVar('haos_retained_buzz',default=None)
+
+
+def native_text(adapter,raw,inputs):
+    from plugins.platforms.buzz.adapter import BuzzAdapter,_find_relay_media_refs,_replace_media_refs
+    text=BuzzAdapter._strip_mention(SimpleNamespace(**inputs),raw['content'])
+    urls,replacements=_find_relay_media_refs(text,adapter._haos_buzz_value['relay_url'])
+    return (_replace_media_refs(text,replacements) or '(attachment)') if urls else text
+
+
+def projection(adapter,row,item):
+    """Pin actual pure-codec inputs before a resource read or native cursor."""
+    from plugins.platforms.buzz.adapter import hex_to_npub
+    db=adapter._haos_native.inbox.db;raw=json.loads(item['raw'])
+    db.execute('''CREATE TABLE IF NOT EXISTS buzz_native_projection(
+        source_key TEXT PRIMARY KEY,raw_id TEXT NOT NULL,binding_digest TEXT NOT NULL,
+        credential_scope TEXT NOT NULL,normalizer TEXT NOT NULL,text TEXT NOT NULL)''')
+    prior=db.execute('SELECT * FROM buzz_native_projection WHERE source_key=?',(item['source_key'],)).fetchone()
+    inputs={'_display_name':adapter._display_name,'_self_pubkey':adapter._self_pubkey,'_self_npub':adapter._self_npub}
+    if prior is not None:
+        if (prior['raw_id']!=item['id'] or prior['binding_digest']!=item['binding_digest']
+                or prior['credential_scope']!=item['credential_scope'] or len(prior['normalizer'].encode())>4096):
+            raise Conflict('retained Buzz native projection changed its original or grant')
+        try:inputs=json.loads(prior['normalizer'])
+        except (ValueError,RecursionError):raise Conflict('invalid retained Buzz normalizer') from None
+    if (not isinstance(inputs,dict) or set(inputs)!={'_display_name','_self_pubkey','_self_npub'}
+            or not isinstance(inputs['_display_name'],str) or len(inputs['_display_name'].encode())>1024
+            or inputs['_self_pubkey']!=adapter._haos_buzz_value['public_key'] or inputs['_self_npub']!=hex_to_npub(inputs['_self_pubkey'])):
+        raise Conflict('native Buzz command normalizer differs from exact private account')
+    text=native_text(adapter,raw,inputs)
+    if not text and item['resources']:text='(attachment)'
+    if not text:raise PermissionError('Buzz source has no actionable text after native mention decoding')
+    if prior is None:
+        db.execute('INSERT INTO buzz_native_projection VALUES(?,?,?,?,?,?)',(item['source_key'],item['id'],
+            item['binding_digest'],item['credential_scope'],json.dumps(inputs,separators=(',',':')),text))
+    elif prior['text']!=text:raise Conflict('retained Buzz native command projection differs from its actual codec')
+    return {**row['envelope'],'text':text}
 
 
 async def capture(adapter,channel,event):
@@ -49,7 +86,10 @@ async def dispatch_stored(adapter,key):
             item=await adapter._haos_buzz_raw.get(native.policy(),native.connector,adapter._haos_buzz_value,row['payload']['raw_id'])
             if item['source_key']!=key or item['envelope']!=row['envelope']:raise Conflict('Buzz retained ingress projection changed')
             context['item']=item
-            if item['resources']:raise PermissionError('private Buzz media decoding is not installed yet')
+            context['projected']=projection(adapter,row,item)
+            from .gateway_buzz_media import retained
+            context['resources']=await retained(adapter,row,item,context['projected']) if item['resources'] else []
+            context['used_imeta']=set()
             event=json.loads(item['raw']);channel=row['envelope']['chat']
             channel_state=adapter._channel_state.setdefault(channel,adapter._new_channel_state('group'))
             before=copy.deepcopy(channel_state)
@@ -69,6 +109,9 @@ async def dispatch_stored(adapter,key):
                 channel_state.clear();channel_state.update(before)
             native.inbox.retry(key)
             if isinstance(error,Conflict):native.inbox.db.execute("UPDATE native_inbox SET state='failed' WHERE id=? AND state='pending'",(key,))
+            if isinstance(error,Refused) and error.retry_after:
+                native.inbox.db.execute("UPDATE native_inbox SET next_attempt=MAX(next_attempt,?) WHERE id=? AND state='pending'",
+                    (time.time()+error.retry_after,key))
             raise
         finally:_CURRENT.reset(token)
 
@@ -91,40 +134,29 @@ def install(adapter):
         return original_source(**kwargs)
     async def handle(self,event):
         state=current(self);envelope=state['row']['envelope'];raw=json.loads(state['item']['raw'])
-        if event.raw_message!=raw or event.media_urls or event.media_types or event.text!=self._strip_mention(raw['content']):
-            raise Conflict('native Buzz text or resource projection changed')
-        # Retain the first actual native command projection and the exact codec
-        # inputs. Display-name changes must not change an already admitted goal.
-        from plugins.platforms.buzz.adapter import BuzzAdapter,hex_to_npub
-        db=self._haos_native.inbox.db
-        db.execute('''CREATE TABLE IF NOT EXISTS buzz_native_projection(
-            source_key TEXT PRIMARY KEY,raw_id TEXT NOT NULL,binding_digest TEXT NOT NULL,
-            credential_scope TEXT NOT NULL,normalizer TEXT NOT NULL,text TEXT NOT NULL)''')
-        prior=db.execute('SELECT * FROM buzz_native_projection WHERE source_key=?',(state['item']['source_key'],)).fetchone()
         inputs={'_display_name':self._display_name,'_self_pubkey':self._self_pubkey,'_self_npub':self._self_npub}
-        if prior is not None:
-            if (prior['raw_id']!=state['item']['id'] or prior['binding_digest']!=state['item']['binding_digest']
-                    or prior['credential_scope']!=state['item']['credential_scope'] or len(prior['normalizer'].encode())>4096):
-                raise Conflict('retained Buzz native projection changed its original or grant')
-            try:inputs=json.loads(prior['normalizer'])
-            except (ValueError,RecursionError):raise Conflict('invalid retained Buzz normalizer') from None
-        if (not isinstance(inputs,dict) or set(inputs)!={'_display_name','_self_pubkey','_self_npub'}
-                or not isinstance(inputs['_display_name'],str) or len(inputs['_display_name'].encode())>1024
-                or inputs['_self_pubkey']!=self._haos_buzz_value['public_key'] or inputs['_self_npub']!=hex_to_npub(inputs['_self_pubkey'])):
-            raise Conflict('native Buzz command normalizer differs from exact private account')
-        text=BuzzAdapter._strip_mention(SimpleNamespace(**inputs),raw['content'])
-        if not text:raise PermissionError('Buzz source has no actionable text after native mention decoding')
-        if prior is None:
-            db.execute('INSERT INTO buzz_native_projection VALUES(?,?,?,?,?,?)',(state['item']['source_key'],state['item']['id'],
-                state['item']['binding_digest'],state['item']['credential_scope'],json.dumps(inputs,separators=(',',':')),text))
-        elif prior['text']!=text:raise Conflict('retained Buzz native command projection differs from its actual codec')
-        event.text=text;event.raw_message=None;event.channel_prompt=None
+        expected=['haos-buzz-resource:'+str(part['index']) for part in state['resources']]
+        if (event.raw_message!=raw or event.media_urls!=expected or event.media_types!=[part['mime'] for part in state['resources']]
+                or event.text!=native_text(self,raw,inputs)):
+            raise Conflict('native Buzz text or resource projection changed')
+        projected=state['projected'];event.text=projected['text'];event.raw_message=None;event.channel_prompt=None
         event.timestamp=datetime.fromtimestamp(state['item']['received_at'],timezone.utc)
         from .gateway_runtime import adapter_envelope
-        projected={**envelope,'text':text}
         self._haos_native.policy().authorize(self._haos_native.connector,projected)
-        if adapter_envelope(event,'buzz')!=projected:raise Conflict('native Buzz envelope differs from retained approval')
-        await original_handle(event);state['accepted']=event._gateway_accepted is True
+        if state['resources']:
+            from gateway.platforms.base import MessageType
+            from .gateway_media_relay import event_scope
+            unique={part['item']['id']:part for part in state['resources']};ids=list(unique)
+            types=[part['mime'] for part in unique.values()];kinds={part['item']['descriptor']['kind'] for part in unique.values()}
+            event.media_urls=['haos-media:'+identity for identity in ids];event.media_types=types;event.media_text_inlined=[False]*len(ids)
+            event.message_type=MessageType.PHOTO if kinds=={'image'} else MessageType.VOICE if kinds=={'voice'} else MessageType.VIDEO if kinds=={'video'} else MessageType.DOCUMENT
+            with event_scope(event,ids,types,platform='buzz'):
+                if adapter_envelope(event,'buzz')!=projected:raise Conflict('native Buzz media envelope differs from retained approval')
+                await original_handle(event)
+        else:
+            if adapter_envelope(event,'buzz')!=projected:raise Conflict('native Buzz envelope differs from retained approval')
+            await original_handle(event)
+        state['accepted']=event._gateway_accepted is True
     async def receive(self,channel,state,event):
         if not await capture(self,channel,event):return
         from .gateway_raw import NativeInbox
@@ -138,13 +170,38 @@ def install(adapter):
     for name in ['connect','send','send_image','send_image_file','send_document','edit_message','delete_message',
             '_download_attachment','_localize_inbound_media']:
         setattr(adapter,name,MethodType(deny,adapter))
-    # The native dispatcher calls this even for text. Admit an unchanged text
-    # projection only inside the verified no-resource context above.
-    async def text_only(self,text,message_id,**kwargs):
+    def authorized(self,user_id,chat_type=None,chat_id=None):
         state=current(self);row=state['row']['envelope']
-        if (state['item']['resources'] or message_id!=row['message_id'] or kwargs.get('user_id')!=row['sender']
+        return user_id==row['sender'] and chat_id==row['chat']
+    def cached(part):
+        from gateway.platforms.base import CachedMedia
+        kind=part['item']['descriptor']['kind']
+        return CachedMedia('haos-buzz-resource:'+str(part['index']),part['mime'],'audio' if kind=='voice' else kind,'attachment')
+    async def attachment(self,metadata):
+        state=current(self)
+        for part in state['resources']:
+            resource=part['resource'];index=part['index']
+            if (resource['mode']=='imeta' and index not in state['used_imeta']
+                    and all(resource[key]==metadata.get(key) for key in ['url','sha256','size','filename','mime_type'])):
+                state['used_imeta'].add(index);return cached(part)
+        raise PermissionError('native Buzz attachment lacks independently retained exact bytes')
+    async def localize(self,text,message_id,**kwargs):
+        state=current(self);row=state['row']['envelope']
+        if (message_id!=row['message_id'] or kwargs.get('user_id')!=row['sender']
                 or kwargs.get('chat_id')!=row['chat']):raise PermissionError('retained Buzz media capability required')
         from gateway.platforms.base import MessageType
-        return text,[],[],MessageType.TEXT
-    adapter._localize_inbound_media=MethodType(text_only,adapter)
+        from plugins.platforms.buzz.adapter import _find_relay_media_refs,_replace_media_refs
+        urls,replacements=_find_relay_media_refs(text,self._haos_buzz_value['relay_url'])
+        parts=[]
+        for url in urls:
+            part=next((part for part in state['resources'] if part['resource']['url']==url),None)
+            if part is None:raise PermissionError('native Buzz media reference has no retained exact source')
+            parts.append(part)
+        if not parts:return text,[],[],MessageType.TEXT
+        values=[cached(part) for part in parts];kinds={value.kind for value in values}
+        kind=MessageType.PHOTO if kinds=={'image'} else MessageType.AUDIO if kinds=={'audio'} else MessageType.VIDEO if kinds=={'video'} else MessageType.DOCUMENT
+        return _replace_media_refs(text,replacements) or '(attachment)',[item.path for item in values],[item.media_type for item in values],kind
+    adapter._is_sender_authorized=MethodType(authorized,adapter)
+    adapter._download_attachment=MethodType(attachment,adapter)
+    adapter._localize_inbound_media=MethodType(localize,adapter)
     return adapter
