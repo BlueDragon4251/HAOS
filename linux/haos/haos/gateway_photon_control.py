@@ -79,9 +79,14 @@ class PolicyServer:
         if type(expected) is not int or expected <= 1 or expected == os.getpid() or (pid, uid, gid) != (expected, os.geteuid(), os.getegid()):
             raise PermissionError('only the exact supervised Photon child may submit custody')
 
+    def failed_receive(self, route, state, authenticated):
+        if authenticated and self.health is not None and route in {'/admit', '/current', '/custody', '/resume', '/cursor', '/gap'}:
+            try: self.health.update(state, 2)
+            except Exception: pass  # Refusal still returns no custody receipt.
+
     async def handle(self, reader, writer):
         task = asyncio.current_task(); self.connections.add(task)
-        status = 403; response = {'approved': False}
+        status = 403; response = {'approved': False}; authenticated = False
         try:
             if len(self.connections) > 4: raise PermissionError('Photon control capacity reached')
             self.peer(writer); self.current()
@@ -108,6 +113,7 @@ class PolicyServer:
                 if int(size) > maximum: raise ValueError('Photon control body exceeds bound')
                 raw = await reader.readexactly(int(size))
                 self.peer(writer); self.current()
+                authenticated = True
                 async with self.lock:
                     response = self.dispatch(route, raw)
                 status = 200
@@ -122,15 +128,22 @@ class PolicyServer:
                 identity = digest([self.connector, exc.reason, sha])
                 self.originals.db.execute('INSERT OR IGNORE INTO photon_refusals VALUES(?,?,?,?)', (identity, self.connector, exc.reason, sha))
                 response = {'approved': False}; status = 200
-            except Exception: status = 503
+            except Exception:
+                self.failed_receive(locals().get('route'), 'storage-unavailable', authenticated)
+                status = 503
+        except Conflict:
+            self.failed_receive(locals().get('route'), 'source-unavailable', authenticated)
+            status = 503
         except (PermissionError, ValueError, UnicodeError, asyncio.IncompleteReadError, asyncio.LimitOverrunError):
             status = 403
-        except (Conflict, TimeoutError, OSError):
+        except (TimeoutError, OSError):
+            self.failed_receive(locals().get('route'), 'storage-unavailable', authenticated)
             status = 503
         except asyncio.CancelledError:
             raise
         except Exception:
             # No SDK/credential/body exceptions cross this private boundary.
+            self.failed_receive(locals().get('route'), 'storage-unavailable', authenticated)
             status = 503
         finally:
             try:

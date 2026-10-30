@@ -42,6 +42,13 @@ def test_generic_startup_error_does_not_hide_an_active_native_rate_limit(source,
     assert not health.permitted()
 
 
+@pytest.mark.parametrize('state', ['source-unavailable', 'storage-unavailable'])
+def test_late_SDK_transport_error_preserves_active_receive_recovery_diagnostic(source, custody, state):
+    health = ledger(source, custody); first = health.update(state, 30)
+    after = health.update('transport-unavailable', 2)
+    assert after['status'] == state and after['next_attempt'] == first['next_attempt'] and not health.permitted()
+
+
 def test_auth_refusal_survives_republication_with_the_same_key(source, custody):
     health = ledger(source, custody); health.update('authentication-refused')
     other = ledger(source, custody, publication='new-publication')

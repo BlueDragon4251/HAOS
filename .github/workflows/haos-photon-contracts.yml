@@ -56,14 +56,19 @@ jobs:
           uv sync --project upstream/hermes-agent --frozen --python 3.11 --no-dev --extra web --extra messaging --extra anthropic --extra bedrock --extra vertex --extra azure-identity --extra matrix --extra voice --extra feishu --extra dingtalk --extra google-chat
           uv pip install --python upstream/hermes-agent/.venv/bin/python --require-hashes --no-deps -r linux/haos/runtime/requirements.txt
           uv pip check --python upstream/hermes-agent/.venv/bin/python
+          curl --fail --silent --show-error --proto '=https' --max-time 90 --max-filesize 2000000 \
+            https://raw.githubusercontent.com/openai/whisper/86098128c0b4f24f0e2aa2994de830614b474227/tests/jfk.flac \
+            --output "$RUNNER_TEMP/photon-public-reference.flac"
+          echo "63a4b1e4c1dc655ac70961ffbf518acd249df237e5a0152faae9a4a836949715  $RUNNER_TEMP/photon-public-reference.flac" | sha256sum --check
       - name: Actual native TLS HTTP protobuf gRPC and durable ingress under the private UID
         run: |
           set -euo pipefail
-          for fixture_case in normal dedicated health-withdraw http401 http403 http429 grpc401 grpc429 wrong-line refresh401 refresh429 reply-confirmed reply-restart reply-disconnect reply-reset reply-sql-refusal reply-withdraw; do
+          for fixture_case in normal dedicated health-withdraw http401 http403 http429 grpc401 grpc429 wrong-line refresh401 refresh429 reply-confirmed reply-restart reply-disconnect reply-reset reply-sql-refusal reply-withdraw media-image media-document media-voice-caf media-truncated media-withdraw media-unapproved media-storage-refusal; do
             docker run --rm --network none --pids-limit 192 --memory 2g \
               -v "$PWD:/repo:ro" -v "$RUNNER_TEMP/photon-installed-runtime/photon:/input/photon:ro" \
               -v "$RUNNER_TEMP/photon-installed-runtime/hermes:/input/hermes:ro" \
               -v "$PWD/upstream/hermes-agent/.venv/lib/python3.11/site-packages:/deps:ro" \
+              -v "$RUNNER_TEMP/photon-public-reference.flac:/public-input/reference.flac:ro" \
               -e HAOS_DISPOSABLE_PHOTON_PROFILE=1 \
               python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
               python3 /repo/linux/haos/probes/probe_photon_profile.py --case "$fixture_case" \
@@ -87,7 +92,7 @@ jobs:
             echo 'Prior observer unexpectedly passed the unchanged withdrawal deadline'
             exit 1
           fi
-          rg --fixed-strings --quiet 'actual profile ignored owner withdrawal' "$RUNNER_TEMP/photon-install/prior-blocked-health.log"
+          python -c 'import pathlib,sys; assert "actual profile ignored owner withdrawal" in pathlib.Path(sys.argv[1]).read_text()' "$RUNNER_TEMP/photon-install/prior-blocked-health.log"
       - uses: actions/upload-artifact@v7
         if: always()
         with:

@@ -11,12 +11,12 @@ const require = createRequire(path.join(config.sidecar, "package.json"));
 const grpc = require("@grpc/grpc-js");
 const loader = require("@grpc/proto-loader");
 const proto = path.join(config.sidecar, "node_modules/@photon-ai/advanced-imessage/proto");
-const definitions = loader.loadSync(["message_service.proto", "event_service.proto", "poll_service.proto", "group_service.proto"].map(
+const definitions = loader.loadSync(["message_service.proto", "event_service.proto", "poll_service.proto", "group_service.proto", "attachment_service.proto"].map(
   (name) => path.join(proto, "photon/imessage/v1", name)), {
   includeDirs: [proto], keepCase: false, longs: Number, enums: String, defaults: true, oneofs: true,
 });
 const services = grpc.loadPackageDefinition(definitions).photon.imessage.v1;
-const counts = { http: {}, grpc: {}, refused_auth: 0, emitted: 0, cancelled: {}, timer_ticks: 0, writes: [], transport_resets: 0 };
+const counts = { http: {}, grpc: {}, refused_auth: 0, emitted: 0, cancelled: {}, timer_ticks: 0, writes: [], transport_resets: 0, downloads_closed: 0 };
 function publish(file, value) {
   fs.writeFileSync(file + ".tmp", JSON.stringify(value));
   fs.renameSync(file + ".tmp", file);
@@ -123,6 +123,25 @@ server.addService(services.PollService.service, methods(services.PollService, {
 }));
 server.addService(services.GroupService.service, methods(services.GroupService, {
   subscribeGroupEvents: (call) => live(call, "SubscribeGroupEvents", false),
+}));
+server.addService(services.AttachmentService.service, methods(services.AttachmentService, {
+  downloadAttachment(call) {
+    if (!authenticated(call, "DownloadAttachment")) return;
+    if (!config.media || call.request.attachmentGuid !== config.media.attachment.guid) {
+      return call.emit("error", { code: grpc.status.NOT_FOUND, details: "fixture attachment not approved" });
+    }
+    const bytes = Buffer.from(config.media.data, "base64");
+    call.on("cancelled", () => { counts.downloads_closed++; save(); });
+    call.write({ header: { attachment: config.media.attachment } });
+    if (config.scenario === "media-withdraw") {
+      call.write({ primaryChunk: bytes.subarray(0, 2) });
+      fs.writeFileSync(config.download_observed, "actual attachment stream opened");
+      return;
+    }
+    const end = config.scenario === "media-truncated" ? bytes.length - 1 : bytes.length;
+    for (let offset = 0; offset < end; offset += 16384) call.write({ primaryChunk: bytes.subarray(offset, Math.min(end, offset + 16384)) });
+    call.end();
+  },
 }));
 server.addService(services.EventService.service, methods(services.EventService, {
   catchUpEvents(call) {

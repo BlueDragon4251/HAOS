@@ -62,7 +62,7 @@ class Ledger:
             previous = self.recorded()
             # Delayed network errors cannot overwrite the original terminal
             # reason. Budget and state either both commit or both roll back.
-            active_limit = (previous['status'] == 'rate-limited' and previous['next_attempt'] > time.time()
+            active_limit = (previous['status'] in {'rate-limited', 'source-unavailable', 'storage-unavailable'} and previous['next_attempt'] > time.time()
                 and state in {'transport-unavailable', 'connecting', 'local-ready', 'upstream-observed'})
             selected = previous['status'] if previous['status'] in TERMINAL or active_limit else state
             deadline = max(previous['next_attempt'], time.time() + delay) if delay else previous['next_attempt']

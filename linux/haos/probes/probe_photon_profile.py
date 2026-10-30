@@ -6,6 +6,7 @@ is copied into that namespace; SDK endpoint literals are replaced only there.
 No cloud account, external delivery, controller or installed OS is claimed.
 """
 import asyncio
+import base64
 import ctypes
 from datetime import datetime, timedelta, timezone
 import hashlib
@@ -47,16 +48,21 @@ async def worker(directory):
         return policy
     redactor = Redactor([value['project_secret']]); inbox = NativeInbox(root / 'inbox.db', redactor)
     relay = RelayInbox(root / 'relay.db', redactor); parent = root / 'profiles'; parent.mkdir(mode=0o700)
+    if config['scenario'].startswith('media-') and config['scenario'] != 'media-unapproved':
+        binding.update(allow_media=True, allow_voice=True)
+        policy = PreparedPhotonPolicy({'version': 1, 'connectors': [{'id': 'phone', 'platform': 'photon'}], 'bindings': [binding]})
     adapter = build(value, parent=parent, connector='phone', policy=current, inbox=inbox)
-    observed = []
+    observed = []; observed_media = []
     def accept(event):
-        envelope = adapter_envelope(event, 'photon'); relay.admit(current(), 'phone', envelope)
+        from haos.gateway_media_relay import event_media
+        envelope = adapter_envelope(event, 'photon'); media = event_media(event, 'photon') if event.media_urls else []
+        relay.admit(current(), 'phone', envelope, media=media); observed_media.append(media)
         observed.append(envelope); return True
     adapter.set_durable_message_handler(accept)
     try:
         connected = await adapter.connect()
         scenario = config['scenario']
-        if scenario not in {'normal', 'dedicated', 'health-withdraw'} and not scenario.startswith('reply-'):
+        if scenario not in {'normal', 'dedicated', 'health-withdraw'} and not scenario.startswith(('reply-', 'media-')):
             if connected: (root / 'emit').write_text('emit fixture native refusal')
             expected = 'identity-refused' if scenario == 'wrong-line' else 'rate-limited' if scenario.endswith('429') else 'authentication-refused'
             deadline = time.monotonic() + 10
@@ -84,7 +90,43 @@ async def worker(directory):
                 'counts': counts, 'live_Photon_verified': False, 'controller_IPC_verified': False, 'OS_release_artifact': False}
         assert connected, adapter._haos_photon_health.recorded()
         assert adapter.is_connected
+        if scenario == 'media-storage-refusal':
+            adapter._haos_photon_originals.db.execute("CREATE TRIGGER refuse_decoded_custody BEFORE UPDATE OF normalized ON photon_originals BEGIN SELECT RAISE(ABORT,'fixture durable source write refusal'); END")
         (root / 'emit').write_text('emit fixture frames')
+        if scenario in {'media-unapproved', 'media-truncated', 'media-withdraw', 'media-storage-refusal'}:
+            deadline = time.monotonic() + 6
+            if scenario == 'media-withdraw':
+                while not (root / 'download-observed').exists():
+                    assert time.monotonic() < deadline, 'actual attachment RPC did not open'
+                    await asyncio.sleep(.01)
+                active[0] = False
+            elif scenario == 'media-unapproved':
+                while adapter._haos_photon_cursor.resume() != '2':
+                    assert time.monotonic() < deadline, 'refused native media did not finish durable cursor processing'
+                    await asyncio.sleep(.01)
+            else:
+                while adapter.is_connected:
+                    assert time.monotonic() < deadline, 'truncated native attachment did not stop the failed transport'
+                    await asyncio.sleep(.01)
+            if scenario == 'media-unapproved': active[0] = False
+            while adapter.is_connected:
+                assert time.monotonic() < deadline, 'actual media withdrawal did not stop Node'
+                await asyncio.sleep(.01)
+            counts = json.loads((root / 'counts.json').read_text())
+            if scenario == 'media-storage-refusal': assert adapter._haos_photon_health.recorded()['status'] == 'storage-unavailable'
+            assert not observed and relay.db.execute('SELECT COUNT(*) FROM inbox').fetchone()[0] == 0
+            assert inbox.db.execute('SELECT COUNT(*) FROM native_inbox').fetchone()[0] == 0
+            originals = adapter._haos_photon_originals.db
+            rows = originals.execute('SELECT length(normalized) AS normalized_bytes FROM photon_originals').fetchall()
+            if scenario == 'media-unapproved':
+                assert counts['grpc'].get('DownloadAttachment', 0) == 0 and not rows
+            else:
+                assert counts['grpc']['DownloadAttachment'] == 1 and len(rows) == 1 and rows[0]['normalized_bytes'] == 0
+                assert originals.execute('SELECT safe FROM photon_resume').fetchone()[0] == 1
+            return {'passed': 5, 'scenario': scenario, 'cases': ['actual_native_attachment_TLS_gRPC_source_and_policy',
+                'unknown_sender_or_missing_media_consent_cannot_fetch', 'failed_or_withdrawn_media_has_no_native_or_parent_receipt',
+                'durable_cursor_does_not_skip_unfinished_original', 'actual_Node_stops_on_failed_or_revoked_media'],
+                'counts': counts, 'live_Photon_verified': False, 'controller_IPC_verified': False, 'OS_release_artifact': False}
         deadline = time.monotonic() + 12
         while not observed:
             if time.monotonic() >= deadline:
@@ -93,7 +135,9 @@ async def worker(directory):
                     'originals': [dict(row) for row in adapter._haos_photon_originals.db.execute('SELECT id,length(normalized) AS bytes FROM photon_originals')]})
             await asyncio.sleep(.025)
         await asyncio.sleep(.3)
-        assert len(observed) == 1 and observed[0]['text'] == 'approved actual protobuf message'
+        assert len(observed) == 1
+        if scenario.startswith('media-'): assert 'approved actual protobuf message' in observed[0]['text']
+        else: assert observed[0]['text'] == 'approved actual protobuf message'
         assert observed[0]['message_id'] == config['message_id']
         assert relay.db.execute('SELECT COUNT(*) FROM inbox').fetchone()[0] == 1
         assert inbox.db.execute('SELECT COUNT(*) FROM native_inbox').fetchone()[0] == 1
@@ -108,6 +152,16 @@ async def worker(directory):
             assert counts['grpc']['SubscribeGroupEvents'] == 1
             assert counts['grpc']['SubscribePollEvents'] == 1
         reply_checks = []
+        if scenario.startswith('media-'):
+            from haos.gateway_media_relay import MediaCache
+            assert len(observed_media) == 1 and len(observed_media[0]) == 1
+            media = MediaCache(inbox).get(current(), observed_media[0][0])
+            assert media['descriptor']['sha256'] == config['media_sha256'] and hashlib.sha256(media['data']).hexdigest() == config['media_sha256']
+            assert json.loads(relay.db.execute('SELECT media FROM inbox').fetchone()[0]) == observed_media[0]
+            counts = json.loads((root / 'counts.json').read_text())
+            assert counts['grpc']['DownloadAttachment'] == 1
+            reply_checks += ['actual_native_attachment_stream_and_codec_preserve_exact_private_bytes',
+                'durable_parent_receipt_includes_only_source_bound_opaque_media_identity', 'unknown_sender_and_replay_do_not_repeat_attachment_RPC']
         if scenario == 'health-withdraw':
             # Stop the actual Node process and observe the real Python health
             # coroutine waiting for its response. No mock, artificial health
@@ -234,7 +288,8 @@ def main():
     scenario = sys.argv[2] if len(sys.argv) == 3 and sys.argv[1] == '--case' else 'normal'
     if scenario not in {'normal', 'dedicated', 'health-withdraw', 'http401', 'http403', 'http429', 'grpc401', 'grpc429', 'wrong-line', 'refresh401', 'refresh429',
             'reply-confirmed', 'reply-restart', 'reply-disconnect', 'reply-reset', 'reply-sql-refusal', 'reply-withdraw'}:
-        raise ValueError('finite fixture case required')
+        if scenario not in {'media-image', 'media-document', 'media-voice-caf', 'media-truncated', 'media-withdraw', 'media-unapproved', 'media-storage-refusal'}:
+            raise ValueError('finite fixture case required')
     root = Path('/usr/lib/haos'); root.mkdir(mode=0o755)
     # Public package sources only. Never broaden permissions on the checkout,
     # provider identity, owner home or mounted frozen dependency environment.
@@ -284,10 +339,31 @@ def main():
     account = {'project_id': 'fixture-project', 'project_secret': secrets.token_urlsafe(32), 'phone': 'shared', 'services': ['iMessage']}
     if scenario in {'dedicated', 'wrong-line'}: account['phone'] = '+15550100002'
     native_token = secrets.token_urlsafe(32); mid = 'spc-' + str(uuid.uuid4()); stamp = {'seconds': int(time.time()), 'nanos': 0}
+    media = None
+    if scenario.startswith('media-'):
+        if scenario == 'media-voice-caf':
+            source = Path('/public-input/reference.flac').read_bytes()
+            assert hashlib.sha256(source).hexdigest() == '63a4b1e4c1dc655ac70961ffbf518acd249df237e5a0152faae9a4a836949715'
+            sys.path[:0] = [str(root), '/repo/linux/haos/runtime']
+            from haos.speech import decode
+            from caf_fixture import encode
+            data = encode(decode(source)[0]); name = 'fixture.caf'; mime = 'application/octet-stream'; uti = 'com.apple.coreaudio-format'
+        elif scenario == 'media-document':
+            data = b'approved fixture document'; name = 'fixture.bin'; mime = 'application/octet-stream'; uti = 'public.data'
+        else:
+            from PIL import Image
+            from io import BytesIO
+            buffer = BytesIO(); Image.new('RGB', (2, 2), 'blue').save(buffer, format='PNG')
+            data = buffer.getvalue(); name = 'fixture.png'; mime = 'image/png'; uti = 'public.png'
+        media = {'attachment': {'guid': str(uuid.uuid4()), 'fileName': name, 'mimeType': mime, 'uti': uti, 'totalBytes': len(data)},
+            'data': base64.b64encode(data).decode()}
     def message(sequence, sender, guid):
         chat = 'any;-;' + sender
         body = {'guid': guid, 'content': {'text': 'approved actual protobuf message'}, 'dateCreated': stamp,
             'sender': {'address': sender, 'service': 'CHAT_SERVICE_TYPE_IMESSAGE'}, 'chatGuids': [chat], 'isFromMe': False}
+        if media:
+            body['content']['attachments'] = [media['attachment']]
+            if scenario == 'media-voice-caf': body['isAudioMessage'] = True
         return {'sequence': sequence, 'messageChanged': {'chatGuid': chat, 'occurredAt': stamp, 'isFromMe': False, 'messageReceived': {'message': body}}}
     approved = message(2, '+15550100001', mid)
     config = {'sidecar': str(root / 'hermes/plugins/platforms/photon/sidecar'), 'key': str(directory / 'server.key'),
@@ -295,7 +371,8 @@ def main():
         'native_token': native_token, 'counts': str(directory / 'counts.json'), 'emit': str(directory / 'emit'),
         'ready': str(directory / 'ready.json'), 'scenario': scenario,
         'reply_source': mid, 'reply_chat': 'any;-;+15550100001', 'reply_receipt': str(uuid.uuid4()), 'write_observed': str(directory / 'write-observed'),
-        'frames': [message(1, '+15550100009', str(uuid.uuid4())), approved, approved] if scenario in {'normal', 'dedicated', 'health-withdraw'} or scenario.startswith('reply-') else []}
+        'media': media, 'download_observed': str(directory / 'download-observed'),
+        'frames': [message(1, '+15550100009', str(uuid.uuid4())), approved, approved] if scenario in {'normal', 'dedicated', 'health-withdraw'} or scenario.startswith(('reply-', 'media-')) else []}
     (directory / 'server.json').write_text(json.dumps(config))
     peer = subprocess.Popen([str(root / 'photon/node'), str(fixtures / 'protocol.mjs'), str(directory / 'server.json')],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -326,6 +403,9 @@ def main():
         provenance.write_text(json.dumps(value))
         (directory / 'worker.json').write_text(json.dumps({'account': account, 'since': int(time.time() * 1000) - 10000, 'message_id': mid,
             'scenario': scenario, 'reply_receipt': config['reply_receipt']}))
+        worker = directory / 'worker.json'; setup = json.loads(worker.read_text())
+        if media: setup['media_sha256'] = hashlib.sha256(base64.b64decode(media['data'])).hexdigest()
+        worker.write_text(json.dumps(setup))
         for entry in directory.rglob('*'): os.chown(entry, 65534, 65534)
         os.chown(directory, 65534, 65534)
         with Path('/etc/passwd').open('a') as output: output.write('haos-gateway:x:65534:65534:fixture:/nonexistent:/usr/sbin/nologin\n')

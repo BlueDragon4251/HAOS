@@ -83,6 +83,8 @@ def test_exact_real_child_pid_controls_original_and_normalized_custody(source, c
 @pytest.mark.parametrize('change', ['wrong-pid', 'wrong-token', 'unknown-route', 'duplicate-header', 'chunked', 'oversize', 'non-json', 'absolute-route'])
 def test_private_unix_transport_refuses_before_original_storage(source, custody, change):
     async def run(server, allowed, token):
+        from haos.gateway_photon_health import Ledger
+        server.health = Ledger(custody[0].store, 'phone', source[0], 'fixture', custody[2])
         route = '/admit'; headers = {}; own = True
         if change == 'wrong-pid': own = False
         elif change == 'wrong-token': token = secrets.token_hex(32)
@@ -99,6 +101,7 @@ def test_private_unix_transport_refuses_before_original_storage(source, custody,
         else:
             assert code == 403 and result == {'approved': False}
         assert custody[0].db.execute('SELECT COUNT(*) FROM photon_originals').fetchone()[0] == 0
+        assert server.health.recorded()['status'] == 'created' and server.health.recorded()['next_attempt'] == 0
     asyncio.run(fixture(source, custody, run))
 
 
@@ -216,6 +219,21 @@ def test_actual_child_finite_status_persists_and_stops_lease(source, custody):
         assert await request(server, allowed, frame(token, '/native-status',
             {'state': 'transport-unavailable', 'retry_after': 2})) == (200, {'approved': True})
         assert server.health.recorded()['status'] == 'authentication-refused'
+    asyncio.run(fixture(source, custody, run))
+
+
+def test_failed_native_normalization_preserves_raw_and_records_supervised_recovery(source, custody):
+    from haos.gateway_photon_health import Ledger
+    async def run(server, allowed, token):
+        server.health = Ledger(custody[0].store, 'phone', source[0], 'fixture', custody[2])
+        code, result = await request(server, allowed, frame(token, '/admit', source[2]))
+        assert code == 200 and result['approved'] is True
+        value = decoded(source); value['content']['text'] = 'changed native projection'
+        assert await request(server, allowed, frame(token, '/custody', {'source': result['source'], 'event': value})) == (503, {'approved': False})
+        assert server.health.recorded()['status'] == 'source-unavailable'
+        assert await request(server, allowed, frame(token, '/lease', {})) == (200, {'approved': False})
+        row = custody[0].db.execute('SELECT raw,normalized,admitted_receipt FROM photon_originals').fetchone()
+        assert row['raw'] and row['normalized'] == b'' and row['admitted_receipt'] == ''
     asyncio.run(fixture(source, custody, run))
 
 

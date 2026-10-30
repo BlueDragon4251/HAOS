@@ -207,6 +207,23 @@ Speech UID through checked controller Unix RPC. The old decoder rejected the
 same valid CAF fixture. This closes a local format gap; the complete Photon
 attachment RPC/controller/speech flow still needs its own native acceptance.
 
+The complete private native fixture now also implements the actual protobuf
+attachment service. Image, document and CAF voice data pass through the real
+TLS/gRPC download stream, Spectrum/sidecar normalization, Python codec and
+private media cache into an opaque media reference in durable parent custody.
+Unknown senders and missing media consent do not trigger a download; replay
+does not fetch the attachment again. Truncated or withdrawn downloads and
+actual SQLite custody refusal preserve the raw source, issue no native/parent
+receipt and cannot advance the restart cursor past the unfinished source.
+
+Authenticated receive/custody failures now record a finite source/storage
+diagnostic and a retry budget before the child may reconnect. A generic late
+SDK transport error does not hide that active diagnosis. Authorization and
+malformed-header refusals remain distinct and cannot poison the status/budget.
+In particular `Conflict` (a `ValueError` subclass) is handled before generic
+payload errors, and `PermissionError` remains separate from other `OSError`
+failures. Existing peer, token and parsing negative assertions are retained.
+
 The native transport probe exercises the actual prepared Spectrum mapper and
 its attachment-stream cleanup with local RPC frames. Python tests exercise the
 independent policy and actual SQLite writes, failures and reopen behavior.
