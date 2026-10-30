@@ -1,0 +1,24 @@
+{
+  "repository": "https://github.com/block/buzz",
+  "commit": "1eb67bb525d66448b56d79f98c4ba0e2188b44c5",
+  "url": "https://api.github.com/repos/block/buzz/tarball/1eb67bb525d66448b56d79f98c4ba0e2188b44c5",
+  "archive_sha256": "86edc7cd6f3a3455e9667e59086984a09718e376bc46135dfb69220503c9f0cd",
+  "official_lock_sha256": "ddbb497947a853648720796b2e02246e654e75a3a66ba0635ebc3a52556851f2",
+  "builder_image": "rust@sha256:4cd829461bd5c4d511c32e269da9cb8929223b666519d8004e35fc8d1d771ab7",
+  "rust_version": "1.98.1",
+  "nostr_version": "0.44.7",
+  "serde_json_version": "1.0.150",
+  "helper_lock_sha256": "35b79b50f79a1838f9fcb7f8d085a825c8fede100c6838a7b2eb8473511abffc",
+  "programs": {
+    "buzz": {
+      "package": "buzz-cli",
+      "package_version": "0.1.0",
+      "version_flag_supported": false
+    },
+    "haos-buzz-verify": {
+      "package": "haos-buzz-verify",
+      "package_version": "0.1.0"
+    }
+  },
+  "client_original_sha256": "617e200d5558a8361694c5556b5e6f8758f28fc3a13f32d15b3996decf8106a1"
+}
