@@ -79,7 +79,7 @@ local relay handoff, not a root-controller mission or live inference.
 ## Remaining before public activation
 
 - Full production-daemon/root-socket acceptance of the prepared private profile,
-  including the complete Pub/Sub lifecycle around the verified SDK transport.
+  with the complete private Pub/Sub lifecycle now tested separately below.
 - Durable native dispatch into the independent root mission/controller queue,
   cancellation, outbox authority and inspected owner recovery/status/logout.
 - Safe input attachments, local voice and video, sealed controller-exported
@@ -398,7 +398,7 @@ semantic hashes and custody proofs are not rewritten.
 
 These file paths are still prepared/private. Offline Owner decisions for file
 upload/publication recovery and native output disposal, the complete public
-account/file GUI, remaining Google ASR/video and Pub/Sub profile acceptance,
+account/file GUI, remaining Google ASR/video and production Pub/Sub daemon acceptance,
 production controller Unix IPC and installed packaging remain open. No Google
 file delivery, real consent entitlement or recipient read is established by the
 local fixtures. No automatic retry or remote orphan deletion is claimed for an
@@ -441,3 +441,31 @@ credential removal remains part of public management integration.
 Exact-source checks: [offline file decisions, private SDK restarts and Tk component](evidence/2026-10-30/google-chat-private-file-recovery-validation.json).
 Previous-source native-file CI is separately pinned:
 [5d67f38 CI](evidence/2026-10-30/google-chat-private-native-files-ci-status.json).
+
+
+## Full private Pub/Sub profile process acceptance
+
+The private profile probe now builds the actual pinned Google adapter under the
+separate gateway UID and runs `connect`, real SDK subscription inspection,
+receive, durable native/relay admission, controller-component handling and native
+SDK reply, disconnect/reconnect and replay as one loop. Local TLS/gRPC provides
+only the external Google service fixture; the actual service-account SDK signs
+RSA assertions and sends scoped OAuth metadata. The fixture checks durable
+original or unknown-sender refusal custody independently before every ACK.
+Unknown senders gain no mission rights and a replay after reconnect creates no
+second source or reply.
+
+Additional full-profile scenes exercise real gRPC `UNAUTHENTICATED`,
+`RESOURCE_EXHAUSTED` with protobuf `RetryInfo(180s)`, and `UNAVAILABLE`.
+Authentication refusal stops the receive channel; a rate refusal persists the
+account budget without hidden SDK retries; transient transport loss recovers
+after the profile backoff and admits only a new source. Root grant withdrawal
+is also checked while a real server-side pull RPC is blocked: closing the SDK
+channel must cancel that RPC, and a subsequently queued source receives neither
+custody nor ACK. A cancelled server handler is allowed to drain before testing
+the absence of new requests; cancellation cannot undo server work already begun.
+
+These scenes are part of the prepared Google Chat CI workflow. They do not
+establish production controller Unix IPC, installed service acceptance, speech
+or video execution, a usable public account/pairing page or live Google delivery.
+The public count remains **15/22**.

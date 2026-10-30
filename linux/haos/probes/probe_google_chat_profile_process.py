@@ -81,12 +81,83 @@ def main():
     publication=directory/'policy.json';publication.write_text(json.dumps(policy));publication.chmod(0o644)
     original_path=profile/('google-chat-'+digest(scope(value)))/'originals.sqlite'
     scenario=os.environ.get('HAOS_GOOGLE_CHAT_PROFILE_ACCOUNT','active')
-    if scenario not in {'active','auth','rate','tokenrate','sendauth','media','mediaauth','mediarate','mediarange','medialarge'}:raise ValueError('finite private profile fixture scenario required')
+    if scenario not in {'active','auth','rate','tokenrate','sendauth','media','mediaauth','mediarate','mediarange','medialarge','pubsub','pubsubauth','pubsubrate','pubsubdisconnect'}:raise ValueError('finite private profile fixture scenario required')
     if scenario in {'media','mediaauth','mediarate','mediarange','medialarge'}:
         binding['allow_media']=True;publication.write_text(json.dumps(policy));publication.chmod(0o644)
     import base64
     image=base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aF10AAAAASUVORK5CYII=')
     api_calls=[];api_requests=[]
+    pubsub_server=None;pubsub_port=0;pubsub_calls=[]
+    import queue
+    pubsub_messages=queue.Queue();pubsub_active=[0];pubsub_lock=threading.Lock();pubsub_fault={'mode':None,'calls':0,'held':False,'cancelled':False}
+    if scenario.startswith('pubsub'):
+        import grpc
+        from concurrent.futures import ThreadPoolExecutor
+        from google.pubsub_v1.types import (PullRequest,PullResponse,ReceivedMessage,PubsubMessage,
+            GetSubscriptionRequest,Subscription,AcknowledgeRequest,ModifyAckDeadlineRequest)
+        from google.protobuf.empty_pb2 import Empty
+        value['inbound']={'mode':'pubsub','subscription':'projects/haos-fixture/subscriptions/haos-private'}
+        def authenticate(context):
+            assert dict(context.invocation_metadata()).get('authorization')=='Bearer local-profile-google-fixture-token'
+        def subscription(request,context):
+            authenticate(context);assert request.subscription==value['inbound']['subscription']
+            pubsub_calls.append(('GetSubscription',request.subscription))
+            return Subscription(name=request.subscription,topic='projects/haos-fixture/topics/chat',detached=False)
+        def pull(request,context):
+            authenticate(context);assert request.subscription==value['inbound']['subscription'] and request.max_messages==1
+            with pubsub_lock:pubsub_active[0]+=1
+            try:
+                if pubsub_fault['mode']:
+                    pubsub_fault['calls']+=1
+                    mode=pubsub_fault['mode']
+                    if mode=='hold':
+                        import time
+                        pubsub_fault['held']=True
+                        while context.is_active():time.sleep(.01)
+                        pubsub_fault['cancelled']=True
+                        return PullResponse()
+                    if mode=='auth':context.abort(grpc.StatusCode.UNAUTHENTICATED,'finite local authentication refusal')
+                    if mode=='rate':
+                        from google.rpc import error_details_pb2,status_pb2
+                        from google.protobuf.any_pb2 import Any
+                        retry=error_details_pb2.RetryInfo();retry.retry_delay.seconds=180
+                        detail=Any();detail.Pack(retry)
+                        status=status_pb2.Status(code=8,message='finite local rate refusal',details=[detail])
+                        context.set_trailing_metadata((('grpc-status-details-bin',status.SerializeToString()),))
+                        context.abort(grpc.StatusCode.RESOURCE_EXHAUSTED,status.message)
+                    if mode=='disconnect':context.abort(grpc.StatusCode.UNAVAILABLE,'finite local transport loss')
+                # Keep empty pulls bounded without spinning; cancellation closes real TLS RPC.
+                try:mid,sender=pubsub_messages.get(timeout=.1)
+                except queue.Empty:return PullResponse()
+                pubsub_calls.append(('Pull',mid,sender))
+                return PullResponse(received_messages=[ReceivedMessage(ack_id=mid+'|'+sender,
+                    message=PubsubMessage(data=json.dumps(event(mid,sender)).encode(),message_id='transport-'+mid),delivery_attempt=1)])
+            finally:
+                with pubsub_lock:pubsub_active[0]-=1
+        def acknowledge(request,context):
+            authenticate(context);assert request.subscription==value['inbound']['subscription'] and len(request.ack_ids)==1
+            mid,sender=request.ack_ids[0].split('|')
+            with sqlite3.connect(original_path) as db:
+                table='google_chat_source_refusals' if sender=='users/456' else 'google_chat_originals'
+                assert db.execute('SELECT COUNT(*) FROM '+table).fetchone()[0]>=1
+                if sender!='users/456':
+                    rows=db.execute('SELECT raw FROM google_chat_originals').fetchall()
+                    assert any(json.loads(row[0])['message']['name']=='spaces/room1/messages/'+mid for row in rows)
+            pubsub_calls.append(('Ack',mid,sender));return Empty()
+        def nack(request,context):
+            authenticate(context);assert request.subscription==value['inbound']['subscription'] and request.ack_deadline_seconds==0
+            pubsub_calls.append(('Nack',tuple(request.ack_ids)));return Empty()
+        handlers={
+            'GetSubscription':grpc.unary_unary_rpc_method_handler(subscription,request_deserializer=GetSubscriptionRequest.deserialize,response_serializer=Subscription.serialize),
+            'Pull':grpc.unary_unary_rpc_method_handler(pull,request_deserializer=PullRequest.deserialize,response_serializer=PullResponse.serialize),
+            'Acknowledge':grpc.unary_unary_rpc_method_handler(acknowledge,request_deserializer=AcknowledgeRequest.deserialize,response_serializer=Empty.SerializeToString),
+            'ModifyAckDeadline':grpc.unary_unary_rpc_method_handler(nack,request_deserializer=ModifyAckDeadlineRequest.deserialize,response_serializer=Empty.SerializeToString)}
+        pubsub_server=grpc.server(ThreadPoolExecutor(max_workers=2))
+        pubsub_server.add_generic_rpc_handlers((grpc.method_handlers_generic_handler('google.pubsub.v1.Subscriber',handlers),))
+        pubsub_port=pubsub_server.add_secure_port('localhost:0',grpc.ssl_server_credentials([(
+            key.private_bytes(serialization.Encoding.PEM,serialization.PrivateFormat.PKCS8,serialization.NoEncryption()),
+            cert.public_bytes(serialization.Encoding.PEM))]));assert pubsub_port
+        pubsub_server.start()
     class API(BaseHTTPRequestHandler):
         def log_message(self,*args):pass
         def response(self,data):
@@ -214,6 +285,23 @@ async def run():
             return AuthorizedHttp(self._credentials,http=Routed(),max_refresh_attempts=0)
         adapter._new_authed_http=MethodType(http,adapter)
         adapter._haos_google_media_http=MethodType(lambda self,authority:http(self,authority),adapter)
+        if v['scenario'].startswith('pubsub'):
+            from haos.gateway_google_chat_pubsub import _subscriber_client
+            from google.oauth2 import service_account
+            from google_auth_httplib2 import Request
+            def subscriber():
+                account=service_account.Credentials.from_service_account_info(v['value']['service_account'],scopes=[
+                    'https://www.googleapis.com/auth/chat.bot','https://www.googleapis.com/auth/pubsub'])
+                base=single_request_http(current,fixture_origin=origin,redactor=inbox.redactor);base.ca_certs=v['ca']
+                class TokenWire:
+                    def __getattr__(self,key):return getattr(base,key)
+                    def request(self,uri,method='GET',body=None,headers=None,**kwargs):
+                        assert uri=='https://oauth2.googleapis.com/token'
+                        response,data=base.request(origin+'/oauth-token',method=method,body=body,headers=headers,**kwargs)
+                        return token_response(uri,response,data,redactor=inbox.redactor)
+                return _subscriber_client(account,current,inbox.redactor,target='localhost:'+str(v['pubsub_port']),
+                    roots=Path(v['ca']).read_bytes(),token_request=Request(http=TokenWire()))
+            adapter._haos_google_subscriber_factory=subscriber
         if v['scenario'] in {'auth','rate','tokenrate'}:
             assert not await adapter.connect() and not adapter.is_connected
             expected='authentication-refused' if v['scenario']=='auth' else 'rate-limited'
@@ -235,16 +323,22 @@ async def run():
             if v['scenario'] in {'rate','tokenrate'}:assert adapter.native_health()['next_attempt']>=wait
             else:assert adapter.native_health()['status']==expected
             print(json.dumps({'blocked':True,'expected':expected}),flush=True);return
+        connected_status='connected-pull' if v['scenario'].startswith('pubsub') else 'listening-tls'
         assert await adapter.connect(),adapter.native_health()
-        assert adapter.is_connected and adapter.native_health()['status']=='listening-tls'
+        assert adapter.is_connected and adapter.native_health()['status']==connected_status
         await adapter.disconnect();assert not adapter.is_connected and adapter.native_health()['status']=='disconnected'
-        assert await adapter.connect() and adapter.is_connected and adapter.native_health()['status']=='listening-tls'
+        assert await adapter.connect() and adapter.is_connected and adapter.native_health()['status']==connected_status
         def certificates(url,method='GET',**kwargs):
             current();assert url==CERTS and method=='GET' and not kwargs
             return SimpleNamespace(status=200,data=json.dumps({'local-google-caller':v['caller_public']}).encode())
-        adapter._haos_google_receiver.http_verifier.request=certificates
+        if not v['scenario'].startswith('pubsub'):adapter._haos_google_receiver.http_verifier.request=certificates
         print(json.dumps({'ready':True}),flush=True)
+        restarted=False
         while True:
+            if v['scenario'].startswith('pubsub') and not restarted and (parent.parent/'reconnect').exists():
+                await adapter.disconnect();assert not adapter.is_connected
+                assert await adapter.connect() and adapter.native_health()['status']==connected_status
+                restarted=True
             if adapter.is_connected:
                 incoming=relay.next(policy())
                 if incoming:
@@ -273,7 +367,7 @@ async def run():
                         controller.gateway.acknowledge(policy(),delivery['id'],{'status':'delivered','message_id':result.message_id,'attempt':delivery['attempt']})
             state={'status':adapter.native_health()['status'],'connected':adapter.is_connected,
                 'parent_records':relay.db.execute('SELECT COUNT(*) FROM inbox').fetchone()[0],
-                'confirmed_outputs':inbox.db.execute("SELECT COUNT(*) FROM google_chat_delivery_groups WHERE state='confirmed'").fetchone()[0]}
+                'restarted':restarted,'confirmed_outputs':inbox.db.execute("SELECT COUNT(*) FROM google_chat_delivery_groups WHERE state='confirmed'").fetchone()[0]}
             marker=parent/'profile-status.tmp';marker.write_text(json.dumps(state));marker.replace(parent/'profile-status.json')
             await asyncio.sleep(.05)
     finally:await adapter.close_profile();inbox.close();relay.close();component.close()
@@ -291,7 +385,7 @@ asyncio.run(run())
     claims={'iss':'https://accounts.google.com','aud':audience,'sub':'123456789','email':caller,'email_verified':True,
         'iat':int(now.timestamp()),'exp':int(now.timestamp())+3600}
     def token(change=None):return jwt.encode(signer,{**claims,**(change or {})}).decode()
-    request={'value':value,'profile':str(profile),'policy':str(publication),'owner':str(owner),'caller_public':caller_public,'api_port':api_server.server_port,'ca':str(ca_file),'scenario':scenario,'image':base64.b64encode(image).decode()}
+    request={'value':value,'profile':str(profile),'policy':str(publication),'owner':str(owner),'caller_public':caller_public,'api_port':api_server.server_port,'pubsub_port':pubsub_port,'ca':str(ca_file),'scenario':scenario,'image':base64.b64encode(image).decode()}
     env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8','PYTHONDONTWRITEBYTECODE':'1'};cases=[]
     for uid,groups in [(0,()),(65533,()),(65534,(0,))]:
         result=subprocess.run([str(runtime/'bin/python'),'-E','-s',str(driver)],input=json.dumps(request).encode(),capture_output=True,
@@ -314,6 +408,74 @@ asyncio.run(run())
                 else:cases.append('actual_SDK_HTTP429_RetryAfter180_survives_disconnect_close_reopen_and_same_account_RSA_key_rotation_without_any_new_network_request')
                 return
             if line!=b'{"ready": true}\n':raise AssertionError((await child.stderr.read()).decode()[-1800:])
+            if scenario.startswith('pubsub'):
+                async def wait_for(expected):
+                    deadline=asyncio.get_running_loop().time()+10
+                    while True:
+                        try:state=json.loads((profile/'profile-status.json').read_text())
+                        except FileNotFoundError:state={}
+                        if expected(state):return state
+                        assert child.returncode is None and asyncio.get_running_loop().time()<deadline,(state,pubsub_calls,api_calls)
+                        await asyncio.sleep(.05)
+                assert len([call for call in pubsub_calls if call[0]=='GetSubscription'])==2
+                pubsub_messages.put(('shared','users/123'))
+                await wait_for(lambda state:state.get('parent_records')==1 and state.get('confirmed_outputs')==1)
+                (directory/'reconnect').write_text('Root fixture requests a lifecycle check')
+                await wait_for(lambda state:state.get('restarted') is True)
+                assert len([call for call in pubsub_calls if call[0]=='GetSubscription'])==3
+                pubsub_messages.put(('shared','users/123'));pubsub_messages.put(('unknown','users/456'))
+                pubsub_messages.put(('second','users/123'))
+                await wait_for(lambda state:state.get('parent_records')==2 and state.get('confirmed_outputs')==2)
+                deadline=asyncio.get_running_loop().time()+5
+                while len([call for call in pubsub_calls if call[0]=='Ack'])<4:
+                    assert asyncio.get_running_loop().time()<deadline;await asyncio.sleep(.05)
+                with sqlite3.connect(original_path) as db:
+                    assert db.execute('SELECT COUNT(*) FROM google_chat_originals').fetchone()[0]==2
+                    assert db.execute('SELECT COUNT(*) FROM google_chat_source_refusals').fetchone()[0]==1
+                assert not [call for call in pubsub_calls if call[0]=='Nack']
+                assert api_calls.count('native-message-create')==2 and api_calls.count('own-bot-membership')==3
+                cases.extend([
+                    'actual_private_profile_real_TLS_gRPC_GetSubscription_and_RSA_OAuth_metadata_before_connected_pull',
+                    'actual_PubSub_profile_ACK_checks_FULL_original_or_unknown_sender_hash_refusal_before_real_SDK_acknowledge',
+                    'actual_PubSub_native_codec_relay_controller_component_and_native_TLS_reply_loop_has_two_unique_outputs',
+                    'actual_PubSub_disconnect_reconnect_revalidates_account_and_subscription_then_replay_preserves_one_source_and_one_reply'])
+                if scenario!='pubsub':
+                    mode=scenario.removeprefix('pubsub');pubsub_fault['mode']=mode
+                    expected={'auth':'authentication-refused','rate':'rate-limited','disconnect':'transport-unavailable'}[mode]
+                    state=await wait_for(lambda state:state.get('status')==expected and (mode!='auth' or state.get('connected') is False))
+                    assert pubsub_fault['calls']==1
+                    await asyncio.sleep(.4);assert pubsub_fault['calls']==1
+                    if mode=='rate':
+                        with sqlite3.connect(profile/'native.sqlite') as db:
+                            wait=db.execute('SELECT next_attempt FROM google_chat_profile_status').fetchone()[0]
+                            assert wait>=__import__('time').time()+175
+                            assert db.execute('SELECT not_before FROM google_chat_profile_budget').fetchone()[0]>=wait
+                        cases.append('actual_full_PubSub_profile_gRPC_RESOURCE_EXHAUSTED_RetryInfo180_is_durable_and_has_no_hidden_SDK_or_profile_retry_during_budget')
+                    elif mode=='auth':
+                        assert not state['connected']
+                        cases.append('actual_full_PubSub_profile_gRPC_UNAUTHENTICATED_stops_receive_RPC_and_preserves_finite_sticky_auth_refusal_without_hidden_retry')
+                    else:
+                        pubsub_fault['mode']=None;pubsub_messages.put(('after-disconnect','users/123'))
+                        await wait_for(lambda state:state.get('parent_records')==3 and state.get('confirmed_outputs')==3 and state.get('status')=='connected-pull')
+                        assert pubsub_fault['calls']==1 and api_calls.count('native-message-create')==3
+                        cases.append('actual_full_PubSub_profile_gRPC_UNAVAILABLE_recovers_after_bounded_backoff_and_admits_one_new_source_and_reply_without_replaying_old_output')
+                    return
+                pubsub_fault['mode']='hold';deadline=asyncio.get_running_loop().time()+3
+                while not pubsub_fault['held']:
+                    assert asyncio.get_running_loop().time()<deadline;await asyncio.sleep(.02)
+                publication.write_text(json.dumps({**policy,'bindings':[]}))
+                await wait_for(lambda state:state.get('status')=='revoked' and state.get('connected') is False)
+                # The server may finish a request already cancelled by the client.
+                # Wait for that handler to drain before offering a new source.
+                deadline=asyncio.get_running_loop().time()+2
+                while pubsub_active[0]:
+                    assert asyncio.get_running_loop().time()<deadline;await asyncio.sleep(.02)
+                assert pubsub_fault['cancelled'],'closing the actual SDK channel must cancel the blocked server RPC'
+                before=list(pubsub_calls);pubsub_messages.put(('withdrawn','users/123'));await asyncio.sleep(.3)
+                assert pubsub_calls==before,(before,pubsub_calls)
+                with sqlite3.connect(original_path) as db:assert db.execute('SELECT COUNT(*) FROM google_chat_originals').fetchone()[0]==2
+                cases.append('actual_Root_grant_withdrawal_stops_PubSub_profile_cancels_blocked_real_TLS_RPC_and_never_accepts_or_ACKs_queued_source')
+                return
             context=ssl.create_default_context(cadata=ca_bytes.decode())
             async with ClientSession(connector=TCPConnector(ssl=context),trust_env=False) as client:
                 async def send(data=None,headers=None,path='/google-chat'):
@@ -430,10 +592,13 @@ asyncio.run(run())
             _,stderr=await asyncio.wait_for(child.communicate(),10)
             assert b'BEGIN PRIVATE KEY' not in stderr and token().encode() not in stderr
     try:asyncio.run(exercise())
-    finally:api_server.shutdown();api_server.server_close();api_thread.join(timeout=2)
+    finally:
+        api_server.shutdown();api_server.server_close();api_thread.join(timeout=2)
+        if pubsub_server is not None:pubsub_server.stop(0).wait(timeout=5)
     print(json.dumps({'passed':len(cases),'cases':cases,'actual_gateway_UID_private_profile_native_lifecycle_RSA_OAuth_TLS_listener_and_FULL_SQLite':True,
         'Google_certificate_endpoint_and_OAuth_service_account_are_explicit_fixtures':True,
-        'actual_native_controller_component_outbox_and_TLS_replies':scenario in {'active','sendauth','media'},
+        'actual_native_controller_component_outbox_and_TLS_replies':scenario in {'active','sendauth','media'} or scenario.startswith('pubsub'),
+        'actual_full_PubSub_profile_TLS_gRPC':scenario.startswith('pubsub'),
         'actual_image_SDK_TLS_native_codec_retention_and_controller_component_transfer':scenario=='media',
         'root_controller_IPC_local_ASR_video_decode_GUI_live_Google_account_or_public_activation':False},indent=2))
 
