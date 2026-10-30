@@ -326,3 +326,48 @@ reopen and damaged custody proof. The existing 172 actual root/kernel checks
 also pass without Hermes source or added skips. Their chroot recovery check
 caught the new constructor dependency being imported too late; the pure root
 helper is now loaded with the gateway module and requires no optional SDK.
+
+### Private native signed callback path
+
+Callbacks require an exact owner-approved HTTPS destination and an independent
+32–128-character signing key for the named peer, plus an explicit callback/read
+flag on that context's timed grant. Private, reserved and loopback IP literals,
+local aliases, userinfo, queries/fragments, shared bearer keys and cross-peer
+key reflection are refused. A peer can register only that exact destination;
+it cannot provide HTTP authentication, a redirect target or a plugin route.
+
+Actual pinned TaskStore config creation/get/list/delete codecs are wrapped in
+private FULL SQLite source/grant/account custody. Embedded initial configuration
+and native JSON-RPC config methods are supported. An existing active config is
+idempotent, history is retained, and deletion withdraws retries. The native
+one-shot notification consumes its config after a definitive final attempt;
+uncertain body writes stay blocked rather than silently acquiring a new config.
+
+The actual Hermes `_send_push_notification` still builds the status payload,
+signs it and handles its result. A reviewed public `_open_push_notification`
+transport hook is added only after comparing the complete original adapter SHA
+from runtime/source.json; preparation validates all source inputs before writes.
+No process-global HTTP/auth function is patched. The HAOS scoped opener verifies
+the exact native semantic payload and separate-key signature, uses verified TLS
+without ambient proxy/cookies/bearer headers, never follows redirects, and adds
+a stable delivery ID. The first native wire body/signature is retained before
+POST. A definite 429 retries that same body/signature/identity after bounded
+Retry-After; 401/403 are persistent auth refusal, while a possibly written or
+unacknowledged body is uncertain and is never automatically resent. Callback
+rows awaiting an actual root-accepted native outcome cannot send. A lost root
+result acceptance receipt can be reconciled through the same immutable root
+event without another native resolution. Shutdown joins bounded sender threads
+before journal closure. Finite pending/uncertain/auth/storage health is exposed
+without callback URLs or keys. HTTP acknowledgment never proves recipient read.
+
+Eleven component cases use actual native config/status/sign/sender code, real
+SQL receipt failure/reconciliation, verified local TLS, strict destinations,
+429 wire replay, 302, 401, deletion, post-body disconnect, actual database/native
+TaskStore reopen and owner withdrawal. Only fixture DNS maps the approved fake
+public hostname to loopback; parent IPC is direct in this component probe. The
+39-case installed-UID/controller/TLS process fixture separately exercises actual
+native config RPCs over the listener and actual signed callback POST after root
+outcome acceptance, with foreign-peer and wrong-destination refusal. The
+callback fixture is now in build and protocol CI. No external callback was sent,
+and no live peer, installed OS or release acceptance is asserted. A2A remains
+private (13/22 public gateways) until complete owner/recovery GUI activation.

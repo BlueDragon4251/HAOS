@@ -3,6 +3,7 @@
   "pyproject_sha256": "6f969b9fdff95e7269ec808361e3ae8be5357036e6257e53a3306878cf8c41dd",
   "uv_lock_sha256": "5b3798f326209475abca8ef7cbf7c9406f12e687c28c0b540dfe597466f48590",
   "auxiliary_client_sha256": "e83807074f3577ac3980f43bfd578ffcc95efb591e38a9427d0e7d33ec7d8e4a",
+  "a2a_adapter_sha256": "3a540adc9b7f6e572d151e2584b6fb48fa5c19a3692a004b516fa8a608d0c4ef",
   "extras": [
     "web",
     "messaging",

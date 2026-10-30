@@ -138,6 +138,7 @@ jobs:
           "$PYTHON" linux/haos/runtime/probe_a2a_https.py linux/haos "$RUNNER_TEMP/provider-contracts/a2a-https.json"
           "$PYTHON" linux/haos/runtime/probe_a2a_media.py linux/haos "$RUNNER_TEMP/provider-contracts/a2a-media.json"
           "$PYTHON" linux/haos/runtime/probe_a2a_artifacts.py linux/haos "$RUNNER_TEMP/provider-contracts/a2a-artifacts.json"
+          "$PYTHON" linux/haos/runtime/probe_a2a_callbacks.py linux/haos "$RUNNER_TEMP/provider-contracts/a2a-callbacks.json"
           "$PYTHON" linux/haos/runtime/probe_email_codec.py linux/haos "$RUNNER_TEMP/provider-contracts/email-codec.json"
           "$PYTHON" linux/haos/runtime/probe_email_transport.py linux/haos "$RUNNER_TEMP/provider-contracts/email-transport.json"
           "$PYTHON" linux/haos/runtime/probe_email_admission.py linux/haos "$RUNNER_TEMP/provider-contracts/email-admission.json"

@@ -23,6 +23,22 @@ class Results:
         if 'read' not in binding['capabilities']:raise PermissionError('independent A2A read grant required')
         return row
 
+    def committed(self,task_id):
+        """Read an exact current result acceptance proof without causing a transition."""
+        with self.tasks.lock:
+            task=self.tasks.entry(task_id)
+            if task is None:return None
+            record=self.tasks.get(task_id)
+            epoch=self.db.execute("SELECT * FROM a2a_result_epochs WHERE task_id=? AND record_sha256=? AND state='committed' ORDER BY created_at DESC LIMIT 1",
+                (task_id,task['record_sha256'])).fetchone()
+            if epoch is None:return None
+            wanted={key:epoch[key] for key in ['source_key','binding_digest','credential_scope','body_sha256','expected_sha256']}
+            if (any(epoch[key]!=task[key] for key in ['source_key','binding_digest','credential_scope'])
+                    or epoch['expected_sha256']!=digest([record['state'],record['reply']])
+                    or epoch['receipt_sha256']!=digest([task_id,epoch['epoch'],wanted,task['record_sha256']])):
+                raise Conflict('current native A2A result acceptance proof changed')
+            return dict(epoch)
+
     def expected(self,body,state):
         from plugins.platforms.a2a import protocol,security
         if (not isinstance(body,str) or not body or len(body.encode())>32000 or self.tasks.redactor.text(body)!=body

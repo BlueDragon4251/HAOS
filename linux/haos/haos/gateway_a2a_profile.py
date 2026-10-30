@@ -49,7 +49,7 @@ def build(value,*,parent,connector,policy,inbox):
     originals=None;indexes={};peers={};publishers={};homes={}
     try:
         from .redaction import Redactor
-        secrets={*value['peer_tokens'].values(),value['tls']['private_key']}
+        secrets={*value['peer_tokens'].values(),value['tls']['private_key'],*[item['secret'] for item in value.get('callbacks',{}).values()]}
         import json
         for _ in range(2):secrets|={json.dumps(s,ensure_ascii=a)[1:-1] for s in tuple(secrets) for a in (True,False)}
         inbox.redactor=Redactor([*inbox.redactor.secrets,*secrets])
@@ -105,6 +105,11 @@ def build(value,*,parent,connector,policy,inbox):
             known={'PermissionError','Conflict','TimeoutError','OSError','RuntimeError','ValueError','AttributeError','KeyError','TypeError','OperationalError','IntegrityError'}
             result['transport_error']=failure if failure is None or failure in known else 'transport-unavailable'
             result['attachment_error']=resource_error[0]
+            callback_states=[native._haos_a2a_callback_health() for native in peers.values()]
+            result['callback_error']=('storage-unavailable' if any(state['worker_failed'] or state['damaged'] for state in callback_states)
+                else 'uncertain-delivery' if any(state['uncertain'] for state in callback_states)
+                else 'authentication-refused' if any(state['authentication_refused'] for state in callback_states) else None)
+            result['callback_pending']=sum(state['pending'] for state in callback_states)
             return result
         announced=[False]
         def revoked():

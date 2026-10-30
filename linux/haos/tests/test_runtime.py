@@ -27,12 +27,24 @@ def dispatch(task, provider, client, kwargs, stream=False):
             return "buffered"
     return "standard"
 ''')
+    (upstream/'plugins/platforms/a2a').mkdir(parents=True)
+    (upstream/'plugins/platforms/a2a/adapter.py').write_text('''import urllib.request
+class A2AAdapter:
+    def _send_push_notification(self, task_id: str, context_id: str, reply: str, state: str) -> None:
+        req=urllib.request.Request('https://fixture.invalid/callback',data=b'{}',method='POST')
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310
+                return resp.status
+        except OSError:
+            return None
+''')
     (overlay / "requirements.txt").write_text("pyjwt==2.15.1 \\\n    --hash=sha256:" + "b" * 64 + "\n")
     source = {"upstream_commit": "a" * 40, "python": "3.11", "extras": ["web", "messaging", "anthropic", "bedrock", "vertex", "azure-identity", "matrix", "voice", "feishu", "dingtalk"],
               "security_versions": {"pyjwt": "2.15.1"}}
     for filename, key, root in [("pyproject.toml", "pyproject_sha256", upstream),
                                 ("uv.lock", "uv_lock_sha256", upstream),
                                 ("agent/auxiliary_client.py", "auxiliary_client_sha256", upstream),
+                                ('plugins/platforms/a2a/adapter.py','a2a_adapter_sha256',upstream),
                                 ("requirements.txt", "requirements_sha256", overlay)]:
         source[key] = hashlib.sha256((root / filename).read_bytes()).hexdigest()
     (overlay / "source.json").write_text(json.dumps(source))
@@ -41,9 +53,11 @@ def dispatch(task, provider, client, kwargs, stream=False):
 
 def test_check_does_not_mutate_upstream(inputs):
     before = (inputs[0] / "agent/auxiliary_client.py").read_bytes()
+    transport=(inputs[0]/'plugins/platforms/a2a/adapter.py').read_bytes()
     runtime.prepare(*inputs, check_only=True)
     assert "2.13.0" in (inputs[0] / "pyproject.toml").read_text()
     assert (inputs[0] / "agent/auxiliary_client.py").read_bytes() == before
+    assert (inputs[0]/'plugins/platforms/a2a/adapter.py').read_bytes()==transport
 
 
 def test_reviewed_constraint_is_applied(inputs):
@@ -55,7 +69,7 @@ def test_reviewed_constraint_is_applied(inputs):
 
 
 @pytest.mark.parametrize("file,root", [(".herald-os-upstream-sha", 0), ("pyproject.toml", 0),
-                                     ("uv.lock", 0), ("requirements.txt", 1), ("agent/auxiliary_client.py", 0)])
+                                     ("uv.lock", 0), ("requirements.txt", 1), ("agent/auxiliary_client.py", 0),('plugins/platforms/a2a/adapter.py',0)])
 def test_changed_inputs_are_refused_before_modification(inputs, file, root):
     path = inputs[root] / file
     path.write_text(path.read_text() + "tampered")
@@ -87,3 +101,16 @@ def test_unreviewed_extra_set_is_refused_before_runtime_overlay_writes(inputs,ch
     before=(inputs[0]/'agent/auxiliary_client.py').read_bytes()
     with pytest.raises(ValueError,match='runtime target changed'):runtime.prepare(*inputs)
     assert (inputs[0]/'agent/auxiliary_client.py').read_bytes()==before
+
+
+def test_native_callback_transport_uses_scoped_opener_without_replacing_native_handler(inputs):
+    from contextlib import contextmanager
+    runtime.prepare(*inputs);namespace={};calls=[]
+    exec(compile((inputs[0]/'plugins/platforms/a2a/adapter.py').read_bytes(),'fixture','exec'),namespace)
+    @contextmanager
+    def private_opener(request,*,timeout):
+        calls.append((request.full_url,request.data,timeout))
+        yield type('Response',(),{'status':204})()
+    adapter=namespace['A2AAdapter']();adapter._open_push_notification=private_opener
+    assert adapter._send_push_notification('task-fixture','context-fixture','reviewed result','completed')==204
+    assert calls==[('https://fixture.invalid/callback',b'{}',10)]

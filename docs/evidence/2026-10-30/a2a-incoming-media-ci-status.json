@@ -1,0 +1,51 @@
+{
+  "date_utc": "2026-10-30",
+  "source_commit": "009b699bd42befb02774facd8981019bf7db289e",
+  "source_tree": "f3b23de6f03d198da2c576323a00b99d5b64b4d8",
+  "all_six_success": true,
+  "runs": [
+    {
+      "id": 40998445591,
+      "name": "HAOS Graphical Initial Setup Security",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/BlueDragon4251/HAOS/actions/runs/40998445591"
+    },
+    {
+      "id": 40998445621,
+      "name": "CI",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/BlueDragon4251/HAOS/actions/runs/40998445621"
+    },
+    {
+      "id": 40998445653,
+      "name": "HAOS services and kernel boundaries",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/BlueDragon4251/HAOS/actions/runs/40998445653"
+    },
+    {
+      "id": 40998445603,
+      "name": "Arch package",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/BlueDragon4251/HAOS/actions/runs/40998445603"
+    },
+    {
+      "id": 40998445588,
+      "name": "HAOS pinned provider protocol contracts",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/BlueDragon4251/HAOS/actions/runs/40998445588"
+    },
+    {
+      "id": 40998441528,
+      "name": "HAOS pinned provider protocol contracts",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/BlueDragon4251/HAOS/actions/runs/40998441528"
+    }
+  ],
+  "scope": "Fresh GitHub Actions API verification at 04:16 UTC for this exact reported head; later local/remote commits require their own CI results."
+}

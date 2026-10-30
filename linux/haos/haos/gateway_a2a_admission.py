@@ -39,7 +39,7 @@ def approve(policy,connector,value,peer,raw,redactor,*,received_at=None):
             or type(data['id']) not in {str,int} or isinstance(data['id'],str) and not 1<=len(data['id'])<=128
             or type(data['id']) is int and not -(2**53)<data['id']<2**53
             or not isinstance(data['method'],str) or data['method'] not in SEND or not isinstance(data['params'],dict)
-            or set(data['params']) not in ({'message'},{'message','contextId'})):
+            or not {'message'}<=set(data['params'])<={'message','contextId','configuration'}):
         raise Refused('unsupported-content')
     params=data['params'];message=params['message']
     if (not isinstance(message,dict) or set(message) not in ({'messageId','contextId','role','parts'},{'messageId','contextId','role','parts','taskId','metadata'})
@@ -65,7 +65,7 @@ def approve(policy,connector,value,peer,raw,redactor,*,received_at=None):
                 or 'mediaType' in part and part['mediaType']!='text/plain'):
             raise Refused('unsupported-content')
     from plugins.platforms.a2a import protocol,security
-    aliases=set([*value['peer_tokens'].values(),value['tls']['private_key']])
+    aliases=set([*value['peer_tokens'].values(),value['tls']['private_key'],*[item['secret'] for item in value.get('callbacks',{}).values()]])
     # Credentials embedded in JSON escapes must not become agent input either.
     for _ in range(2):
         import json
@@ -89,6 +89,11 @@ def approve(policy,connector,value,peer,raw,redactor,*,received_at=None):
     try:binding=policy.authorize(connector,envelope)
     except PermissionError:raise Refused('unapproved-route') from None
     validate_binding(binding)
+    if 'configuration' in params:
+        owner=value.get('callbacks',{}).get(peer)
+        if ('taskId' in message or owner is None or binding.get('allow_callback') is not True or 'read' not in binding['capabilities']
+                or params['configuration']!={'taskPushNotificationConfig':{'url':owner['url']}}):
+            raise Refused('independent-callback-approval-required')
     from .gateway_media import approved
     if any(not approved(binding,resource['kind']) for resource in resources):raise Refused('independent-media-consent-required')
     required='answer' if 'taskId' in message else 'create'

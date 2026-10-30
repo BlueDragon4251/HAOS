@@ -21,6 +21,18 @@ def patch_auxiliary(upstream, expected_sha256, *, check_only=False):
         path.write_text(text.replace(anchor, addition + anchor))
 
 
+def patch_a2a(upstream,expected_sha256,*,check_only=False):
+    """Keep native callback construction/signing behind a scoped transport hook."""
+    path=upstream/'plugins/platforms/a2a/adapter.py';data=path.read_bytes()
+    if hashlib.sha256(data).hexdigest()!=expected_sha256:raise ValueError('A2A transport overlay belongs to another Hermes source')
+    anchor='    def _send_push_notification(self, task_id: str, context_id: str, reply: str, state: str) -> None:\n'
+    transport='            with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310\n'
+    addition='    def _open_push_notification(self, request, *, timeout):\n        """Scoped callback transport; native payload, signing and handling stay here."""\n        return urllib.request.urlopen(request, timeout=timeout)  # noqa: S310\n\n'
+    text=data.decode()
+    if text.count(anchor)!=1 or text.count(transport)!=1:raise ValueError('pinned A2A callback transport changed')
+    if not check_only:path.write_text(text.replace(anchor,addition+anchor).replace(transport,'            with self._open_push_notification(req, timeout=10) as resp:\n'))
+
+
 def prepare(upstream: Path, overlay: Path, *, check_only=False):
     source = json.loads((overlay / "source.json").read_text())
     if (upstream / ".herald-os-upstream-sha").read_text().strip() != source["upstream_commit"]:
@@ -43,8 +55,11 @@ def prepare(upstream: Path, overlay: Path, *, check_only=False):
     replacement = '"PyJWT[crypto]==' + source["security_versions"]["pyjwt"] + '"'
     if text.count(original) != 1:
         raise ValueError("upstream PyJWT constraint changed; review this overlay")
-    patch_auxiliary(upstream, source["auxiliary_client_sha256"], check_only=check_only)
+    patch_auxiliary(upstream, source["auxiliary_client_sha256"], check_only=True)
+    patch_a2a(upstream,source['a2a_adapter_sha256'],check_only=True)
     if not check_only:
+        patch_auxiliary(upstream,source['auxiliary_client_sha256'])
+        patch_a2a(upstream,source['a2a_adapter_sha256'])
         path.write_text(text.replace(original, replacement))
 
 

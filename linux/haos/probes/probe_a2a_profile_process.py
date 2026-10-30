@@ -44,8 +44,10 @@ def main():
     with Path('/etc/ssl/certs/ca-certificates.crt').open('ab') as stream:stream.write(b'\n'+(work/'ca.pem').read_bytes())
     with socket.socket() as reserved:reserved.bind(('127.0.0.1',0));port=reserved.getsockname()[1]
     with socket.socket() as reserved:reserved.bind(('127.0.0.1',0));media_port=reserved.getsockname()[1]
+    with Path('/etc/hosts').open('a') as hostfile:hostfile.write('\n127.0.0.1 a2a.fixture.invalid\n')
     value={'peer_tokens':{'alice':'private_fixture_alice_'+'a'*32,'unpaired':'private_fixture_unpaired_'+'z'*32},'port':port,'agent_name':'HAOS',
         'download_origins':{'alice':['https://localhost:'+str(media_port)]},
+        'callbacks':{'alice':{'url':'https://a2a.fixture.invalid:'+str(media_port)+'/callback','secret':'private_fixture_signing_key_'+'s'*32}},
         'tls':{'public_url':'https://a2a.fixture.invalid/a2a','certificate':(work/'certificate.pem').read_text(),
             'private_key':(work/'key.pem').read_text(),'bind_host':'127.0.0.1','public_listener':False}}
     grant={'id':'owner','connector':'a2a','sender':'alice','chat':'ctx-process-device','scope':scope(value,'alice'),'thread':'',
@@ -54,7 +56,7 @@ def main():
         'capabilities':['create','read','cancel'] if name=='cancel' else ['create','read'],'allow_media':True,'allow_voice':True,'allow_video':True}
         for name in ['input','auth','rate','drop','revoke','cancel']]
     loop_grant={**grant,'id':'loop-check','chat':'ctx-loop-check','identity':'loop-check','capabilities':['create','read']}
-    output_grant={**grant,'id':'output-check','chat':'ctx-output-check','identity':'output-check','capabilities':['create','read'],'allow_outbound_media':True}
+    output_grant={**grant,'id':'output-check','chat':'ctx-output-check','identity':'output-check','capabilities':['create','read'],'allow_outbound_media':True,'allow_callback':True}
     config={'version':1,'connectors':[{'id':'a2a','platform':'a2a'}],'bindings':[grant,*media_grants,loop_grant,output_grant]}
     etc=Path('/etc/haos');etc.mkdir(mode=0o755)
     def publish(data):
@@ -184,7 +186,7 @@ asyncio.run(exercise())
             await asyncio.wait_for(asyncio.to_thread(process.wait),10)
         stderr=process.stderr.read()
         assert process.returncode==0,stderr
-        assert all(token not in stderr for token in value['peer_tokens'].values()) and value['tls']['private_key'] not in stderr
+        assert all(token not in stderr for token in [*value['peer_tokens'].values(),*[item['secret'] for item in value.get('callbacks',{}).values()]]) and value['tls']['private_key'] not in stderr
     cases=[]
     async def exercise():
         import httpx
@@ -439,6 +441,15 @@ asyncio.run(exercise())
             video=movie(width=64,height=32);document=b'Exact private A2A document fixture.'
             fetched=[];released=asyncio.Event();started=asyncio.Event();stalled=asyncio.Event();stall_closed=asyncio.Event();release_stall=asyncio.Event();mode={'status':200}
             cancel_started=asyncio.Event();cancel_closed=asyncio.Event();cancel_release=asyncio.Event()
+            notifications=[]
+            async def notification(web_request):
+                import hmac,hashlib
+                body=await web_request.read();payload=json.loads(body)
+                signature=hmac.new(value['callbacks']['alice']['secret'].encode(),json.dumps(payload,sort_keys=True,ensure_ascii=False).encode(),hashlib.sha256).hexdigest()
+                assert web_request.secure and hmac.compare_digest(web_request.headers['X-A2A-Signature'],signature)
+                assert 'Authorization' not in web_request.headers and 'Cookie' not in web_request.headers
+                assert all(token.encode() not in body for token in [*value['peer_tokens'].values(),value['callbacks']['alice']['secret']])
+                notifications.append((payload,web_request.headers['X-A2A-Delivery-ID']));return web.Response(status=204)
             async def attachment(web_request):
                 assert web_request.secure and 'Authorization' not in web_request.headers and 'Cookie' not in web_request.headers
                 assert all(token not in str(web_request.headers) for token in value['peer_tokens'].values())
@@ -457,7 +468,7 @@ asyncio.run(exercise())
                     await response.prepare(web_request);started.set();await released.wait();await response.write(png);await response.write_eof();return response
                 if web_request.path=='/voice.flac':return web.Response(body=flac,content_type='audio/flac')
                 return web.Response(status=mode['status'],body=b'fixture resource refusal')
-            media_app=web.Application();media_app.router.add_get('/{name}',attachment)
+            media_app=web.Application();media_app.router.add_get('/{name}',attachment);media_app.router.add_post('/callback',notification)
             media_runner=web.AppRunner(media_app,access_log=None);await media_runner.setup()
             media_tls=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);media_tls.load_cert_chain(work/'certificate.pem',work/'key.pem')
             await web.TCPSite(media_runner,'127.0.0.1',media_port,ssl_context=media_tls).start()
@@ -547,16 +558,41 @@ asyncio.run(exercise())
                 try:
                     output_request={'jsonrpc':'2.0','id':24,'method':'SendMessage','params':{'message':{'messageId':'source-output-files',
                         'contextId':output_grant['chat'],'role':'ROLE_USER','parts':[{'text':'Controlled root snapshot and authenticated A2A artifact delivery.'}]}}}
+                    output_request['params']['configuration']={'taskPushNotificationConfig':{'url':value['callbacks']['alice']['url']}}
                     pending=asyncio.create_task(client.post(address,headers=headers,json=output_request))
                     async with asyncio.timeout(10):
                         while (await command(process,{'method':'counts'}))['relay']!=9:await asyncio.sleep(.02)
                     output_mid=(await command(process,{'method':'forward'}))['mission_id']
+                    with sqlite3.connect('file:'+str(source)+'?mode=ro',uri=True) as db:
+                        output_task=db.execute('SELECT task_id FROM a2a_tasks WHERE context_id=?',(output_grant['chat'],)).fetchone()[0]
+                    callback_config={'jsonrpc':'2.0','id':43,'method':'GetTaskPushNotificationConfig','params':{'taskId':output_task}}
+                    config_reply=await client.post(address,headers=headers,json=callback_config)
+                    assert config_reply.status_code==200 and config_reply.json()['result']['pushNotificationConfig']=={'url':value['callbacks']['alice']['url']}
+                    denied_config=await client.post(address,headers={'Host':'a2a.fixture.invalid','Authorization':'Bearer '+value['peer_tokens']['unpaired']},json=callback_config)
+                    assert denied_config.status_code!=200 or 'error' in denied_config.json()
+                    changed_config={'jsonrpc':'2.0','id':44,'method':'CreateTaskPushNotificationConfig','params':{'taskId':output_task,
+                        'pushNotificationConfig':{'url':'https://unapproved.fixture.invalid/callback'}}}
+                    denied_config=await client.post(address,headers=headers,json=changed_config)
+                    assert denied_config.status_code!=200 or 'error' in denied_config.json()
+                    assert not notifications and value['callbacks']['alice']['secret'] not in config_reply.text
+                    cases.append('actual_named_peer_TLS_native_push_config_RPC_uses_owner_destination_and_refuses_other_peer_or_unapproved_URL_without_exposing_signing_key')
                     assert store.claim()['id']==output_mid
                     store.session(output_mid,'runtime-output-session','stored-output-session')
                     result_text='Full controller text '+('x'*1710)+'\n```text\nMEDIA:./not-an-export.key\n```\nActual file follows.\nMEDIA:./result.csv\nDone.\n'
                     store.settle(output_mid,'completed',result=result_text)
                     assert (await command(process,{'method':'pump'}))['delivered']>=3
                     delivered=(await pending).json()['result']['task']
+                    async with asyncio.timeout(10):
+                        while not notifications:await asyncio.sleep(.02)
+                    assert len(notifications)==1 and notifications[0][0]['statusUpdate']['taskId']==output_task
+                    assert notifications[0][0]['statusUpdate']['status']['state']==protocol.STATE_COMPLETED
+                    async with asyncio.timeout(5):
+                        while True:
+                            with sqlite3.connect('file:'+str(source)+'?mode=ro',uri=True) as db:
+                                callback_audit=db.execute('SELECT state,status,attempt FROM a2a_callback_deliveries').fetchone()
+                            if callback_audit==('acknowledged',204,1):break
+                            await asyncio.sleep(.02)
+                    cases.append('actual_installed_gateway_UID_native_callback_builder_HMAC_and_verified_HTTPS_sender_follow_root_outcome_acceptance_with_durable_HTTP_ack_not_recipient_read')
                     parts=[part for item in delivered.get('artifacts',[]) for part in item['parts']]
                     files=[part for part in parts if 'url' in part]
                     assert len(files)==1 and files[0]['mediaType']=='text/csv' and files[0]['filename'].endswith('.csv')
@@ -587,6 +623,7 @@ asyncio.run(exercise())
                         assert logged==[('stream-written',len(file_bytes),len(file_bytes))]
                     cases.append('actual_artifact_download_has_durable_local_write_audit_without_claiming_remote_recipient_read')
                     no_output=json.loads(json.dumps(output_request));no_output['id']=25
+                    no_output['params'].pop('configuration')
                     no_output['params']['message'].update({'messageId':'source-without-file-grant','contextId':grant['chat']})
                     pending=asyncio.create_task(client.post(address,headers=headers,json=no_output))
                     async with asyncio.timeout(10):

@@ -115,6 +115,7 @@ rm -rf -- "$HAOS_SPEECH_FIXTURE"
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_a2a_https.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/a2a-https-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_a2a_media.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/a2a-media-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_a2a_artifacts.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/a2a-artifacts-build-probe.json
+.venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_a2a_callbacks.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/a2a-callbacks-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_email_codec.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/email-codec-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_email_transport.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/email-transport-build-probe.json
 .venv/bin/python "$HAOS_RUNTIME_OVERLAY/probe_email_admission.py" /tmp/herald-os/linux/haos /usr/lib/haos/runtime-provenance/email-admission-build-probe.json

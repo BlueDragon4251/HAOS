@@ -42,6 +42,20 @@ class Server:
 
     def control(self,adapter,method,params):
         from plugins.platforms.a2a import protocol
+        from .gateway_a2a_callbacks import METHODS,CREATE,LIST
+        if method in METHODS:
+            allowed={'taskId','pushNotificationConfig'} if method in CREATE else {'taskId'} if method in LIST else {'taskId','id','configId'}
+            if (not isinstance(params,dict) or 'taskId' not in params or not set(params)<=allowed
+                    or not isinstance(params['taskId'],str) or not re.fullmatch('task-[0-9a-f]{16}',params['taskId'])):
+                raise Refused('unsupported-content')
+            if method in CREATE:
+                if not isinstance(params.get('pushNotificationConfig'),dict) or set(params['pushNotificationConfig'])!={'url'}:
+                    raise Refused('unsupported-content')
+            if any(not isinstance(params[k],str) or not re.fullmatch('cfg-[0-9a-f]{12}',params[k]) for k in ['id','configId'] if k in params):
+                raise Refused('unsupported-content')
+            if 'id' in params and 'configId' in params and params['id']!=params['configId']:raise Refused('unsupported-content')
+            adapter.tasks.callbacks.target(params['taskId'])
+            return adapter.tasks.get(params['taskId'])
         allowed={'GetTask','tasks/get','SubscribeToTask','tasks/subscribe','CancelTask','tasks/cancel','ListTasks','tasks/list'}
         if method not in allowed:raise Refused('unsupported-method')
         if method in {'ListTasks','tasks/list'}:

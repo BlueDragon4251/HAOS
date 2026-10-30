@@ -34,7 +34,7 @@ class Tasks:
             raise PermissionError('private A2A peer, current publication and independent policy required')
         current();self.peer=peer;self.value=value;self.current=current;self.policy=policy;self.connector=connector
         self.credential_scope=digest([connector,value])
-        secrets=set([*value['peer_tokens'].values(),value['tls']['private_key']])
+        secrets=set([*value['peer_tokens'].values(),value['tls']['private_key'],*[item['secret'] for item in value.get('callbacks',{}).values()]])
         for _ in range(2):secrets|={json.dumps(text,ensure_ascii=ascii)[1:-1] for text in tuple(secrets) for ascii in (True,False)}
         self.redactor=Redactor(sorted(secrets,key=len,reverse=True))
         # Reuse the established actual private-dir/file/owner/WAL checks. The
@@ -276,14 +276,15 @@ class Tasks:
             next_offset=offset+page_size if offset+page_size<total else 0
             return (page,next_offset,total) if with_total else (page,next_offset)
 
-    def set_push_config(self,*_args,**_kwargs):
-        raise PermissionError('A2A callback delivery requires a separate reviewed owner destination and private transport')
+    def set_push_config(self,*args,**kwargs):
+        if not hasattr(self,'callbacks'):raise PermissionError('private owner callback transport unavailable')
+        return self.callbacks.set(*args,**kwargs)
 
-    def get_push_config(self,*_args,**_kwargs):return None
+    def get_push_config(self,*args,**kwargs):return self.callbacks.get(*args,**kwargs) if hasattr(self,'callbacks') else None
 
-    def list_push_configs(self,*_args,**_kwargs):return []
+    def list_push_configs(self,*args,**kwargs):return self.callbacks.list(*args,**kwargs) if hasattr(self,'callbacks') else []
 
-    def delete_push_config(self,*_args,**_kwargs):return False
+    def delete_push_config(self,*args,**kwargs):return self.callbacks.delete(*args,**kwargs) if hasattr(self,'callbacks') else False
 
     def fail_orphans(self,timeout_seconds=300,*,exclude=None):
         # HTTP disconnect and process restart do not cancel durable HAOS missions.
@@ -294,7 +295,7 @@ class Tasks:
 
     def pop_push_url(self,task_id):
         if self.get(task_id) is None:return ''
-        return ''  # No callback can have been configured through this closed index.
+        return self.callback_delivery.pop_url(task_id) if hasattr(self,'callback_delivery') else ''
 
     def result_intent(self,task_id,body,state,projected):
         from plugins.platforms.a2a import protocol

@@ -40,10 +40,22 @@ def build(value,peer,home,current,policy,tasks,receive):
     adapter._haos_a2a_artifacts=Artifacts(tasks)
     adapter._haos_a2a_home=home;adapter._haos_a2a_environment=environment
     adapter._security_context=security_context({**value,'peer_tokens':{peer:value['peer_tokens'][peer]}})
+    if peer in value.get('callbacks',{}):
+        from dataclasses import replace
+        adapter._security_context=replace(adapter._security_context,push_secret=value['callbacks'][peer]['secret'])
     native_prepare=adapter._prepare_task.__func__;native_handle=adapter.handle_message.__func__
     native_send=adapter.send.__func__;native_finalize=adapter._finalize_task.__func__;native_resolve=adapter._resolve_task.__func__
     finalize_lock=threading.RLock();send_lock=asyncio.Lock();prepared={};finalized={};closing=[False]
     identity=deepcopy(adapter._security_context)
+    from .gateway_a2a_callbacks import Configs
+    from .gateway_a2a_callback_delivery import Delivery
+    tasks.callbacks=Configs(tasks)
+    callbacks=Delivery(adapter,tasks,tasks.callbacks,adapter._send_push_notification.__func__)
+    tasks.callback_delivery=callbacks;callback_worker=[None];callback_failed=[False]
+    def queue_callback(self,task_id,context_id,reply,state):callbacks.queue(task_id,context_id,reply,state)
+    def callback_open(self,request,*,timeout):return callbacks.open(request,timeout=timeout)
+    adapter._send_push_notification=MethodType(queue_callback,adapter)
+    adapter._open_push_notification=MethodType(callback_open,adapter)
 
     def check():
         if closing[0]:raise PermissionError('private A2A native profile is closed')
@@ -286,8 +298,8 @@ def build(value,peer,home,current,policy,tasks,receive):
     def card(self,public_url=None,agent=None):
         check()
         result=native_card(self,public_url=value['tls']['public_url'],agent=self._agents[''])
-        result['capabilities']['pushNotifications']=False
         bindings=[row for row in policy().bindings.values() if row['connector']==tasks.connector]
+        result['capabilities']['pushNotifications']=bool(peer in value.get('callbacks',{}) and any(row['sender']==peer and row.get('allow_callback') is True for row in bindings))
         if any(row.get('allow_media') for row in bindings):result['defaultInputModes']+=['application/octet-stream','image/png','image/jpeg']
         if any(row.get('allow_voice') for row in bindings):result['defaultInputModes']+=['audio/flac','audio/ogg','audio/wav','audio/mpeg','audio/mp4','audio/amr']
         if any(row.get('allow_video') for row in bindings):result['defaultInputModes']+=['video/mp4','video/3gpp','video/3gpp2']
@@ -296,6 +308,9 @@ def build(value,peer,home,current,policy,tasks,receive):
     def skills(self,agent=None):return protocol.skills_from_toolsets(['haos_missions'])
     async def close(self):
         closing[0]=True
+        callbacks.stop()
+        if callback_worker[0] is not None:
+            callback_worker[0].cancel();await asyncio.gather(callback_worker[0],return_exceptions=True);callback_worker[0]=None
         receivers={task for task in receive_tasks if task is not asyncio.current_task()}
         for task in receivers:task.cancel()
         await asyncio.gather(*receivers,return_exceptions=True)
@@ -323,4 +338,12 @@ def build(value,peer,home,current,policy,tasks,receive):
     adapter._haos_a2a_final_lock=finalize_lock
     adapter._emit_terminal=MethodType(emit,adapter);adapter._sse_write=MethodType(sse,adapter)
     adapter._build_card=MethodType(card,adapter)
-    check();return adapter
+    def callback_health():return {**callbacks.health(),'worker_failed':callback_failed[0]}
+    adapter._haos_a2a_callback_health=callback_health
+    check()
+    if peer in value.get('callbacks',{}):
+        callback_worker[0]=asyncio.create_task(callbacks.run())
+        def callback_finished(task):
+            if not task.cancelled() and task.exception() is not None:callback_failed[0]=True
+        callback_worker[0].add_done_callback(callback_finished)
+    return adapter
