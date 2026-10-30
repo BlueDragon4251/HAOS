@@ -6,6 +6,7 @@ import pytest
 
 from test_gateway_photon_admission import source, custody
 from haos.gateway_photon_health import Ledger
+from haos.gateway import Conflict
 
 
 def ledger(source, custody, *, connector='phone', publication='fixture-publication', value=None):
@@ -91,3 +92,58 @@ def test_authority_loss_can_record_denial_and_cannot_record_a_new_connection(sou
 @pytest.mark.parametrize('state,delay', [('invented', 0), ('rate-limited', True), ('rate-limited', float('inf')), ('rate-limited', -1), ('rate-limited', 86401)])
 def test_unbounded_or_unknown_state_input_refused(source, custody, state, delay):
     with pytest.raises(ValueError): ledger(source, custody).update(state, delay)
+
+
+@pytest.fixture
+def separated(source, custody, tmp_path):
+    from haos.gateway_raw import NativeInbox
+    from haos.redaction import Redactor
+    inbox = NativeInbox(tmp_path / 'native.db', Redactor([source[0]['project_secret']]))
+    def make(publication='original', value=None):
+        return Ledger(inbox, 'phone', value or source[0], publication, custody[2], profile=custody[0])
+    yield inbox, make
+    inbox.close()
+
+
+@pytest.mark.parametrize('change', ['status-table', 'budget-table', 'both-tables', 'status-row', 'budget-row', 'budget-key-rotation',
+    'credential-row', 'unknown-state', 'invalid-time', 'infinite-budget'])
+def test_damaged_persistent_status_cannot_be_recreated_as_a_fresh_account(source, custody, separated, change):
+    inbox, make = separated; health = make(); health.update('authentication-refused', 90); db = inbox.db
+    value = None
+    if change == 'status-table': db.execute('DROP TABLE photon_profile_status')
+    elif change == 'budget-table': db.execute('DROP TABLE photon_account_budget')
+    elif change == 'both-tables':
+        db.execute('DROP TABLE photon_profile_status'); db.execute('DROP TABLE photon_account_budget')
+    elif change == 'status-row': db.execute('DELETE FROM photon_profile_status')
+    elif change in {'budget-row', 'budget-key-rotation'}:
+        db.execute('DELETE FROM photon_account_budget')
+        if change == 'budget-key-rotation': value = {**source[0], 'project_secret': secrets.token_urlsafe(32)}
+    elif change == 'credential-row': db.execute('UPDATE photon_profile_status SET credential_scope=?', ('f' * 64,))
+    elif change == 'unknown-state': db.execute("UPDATE photon_profile_status SET status='private malformed state'")
+    elif change == 'invalid-time': db.execute('UPDATE photon_profile_status SET updated_at=?', (float('inf'),))
+    elif change == 'infinite-budget': db.execute('UPDATE photon_account_budget SET next_attempt=?', (float('inf'),))
+    def snapshot():
+        tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE name IN ('photon_profile_status','photon_account_budget')")}
+        return {name: [tuple(row) for row in db.execute('SELECT * FROM ' + name)] for name in tables}
+    before = snapshot()
+    with pytest.raises(Conflict): make('changed-publication', value)
+    assert snapshot() == before
+    assert custody[0].db.execute('SELECT COUNT(*) FROM photon_health_profiles').fetchone()[0] == 1
+
+
+def test_original_status_provenance_survives_reopen_key_rotation_and_publication(source, custody, separated):
+    inbox, make = separated; first = make(); first.update('rate-limited', 120)
+    same = make(); assert same.identity == first.identity and same.read() == first.read()
+    changed = make('new', {**source[0], 'project_secret': secrets.token_urlsafe(32)})
+    assert changed.read()['next_attempt'] == first.read()['next_attempt'] and not changed.permitted()
+    assert custody[0].db.execute('SELECT COUNT(*) FROM photon_health_profiles').fetchone()[0] == 2
+    inbox.db.execute('DELETE FROM photon_profile_status WHERE id=?', (first.identity,))
+    with pytest.raises(Conflict): make('new', {**source[0], 'project_secret': secrets.token_urlsafe(32)})
+
+
+def test_missing_status_tables_beside_legacy_native_records_are_not_a_new_empty_account(source, custody, separated):
+    inbox, make = separated
+    inbox.db.execute('CREATE TABLE photon_output_intents(retained_fixture_id TEXT)')
+    with pytest.raises(Conflict, match='retained native'): make()
+    assert not inbox.db.execute("SELECT 1 FROM sqlite_master WHERE name='photon_profile_status'").fetchone()
+    assert inbox.db.execute("SELECT 1 FROM sqlite_master WHERE name='photon_output_intents'").fetchone()

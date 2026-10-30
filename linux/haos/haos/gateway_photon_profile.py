@@ -70,7 +70,7 @@ def build(value, *, parent, connector, policy, inbox):
         adapter._haos_photon_check = check
         originals = Originals(profile / 'originals.db', inbox.redactor, check); adapter._haos_photon_originals = originals
         adapter._haos_photon_cursor = Cursor(originals, value, authority)
-        adapter._haos_photon_health = Ledger(inbox, connector, value, identity, authority)
+        adapter._haos_photon_health = Ledger(inbox, connector, value, identity, authority, profile=originals)
         from .gateway_photon_codec import install
         install(adapter)
         from .gateway_photon_delivery import Publisher
@@ -222,10 +222,19 @@ def lifecycle(adapter, lease, home):
     async def close(self):
         async with serial:
             if self._haos_photon_closed: return
-            self._haos_photon_stopping = True; await stop(immediate=True)
-            try: health.update('closed')
-            except PermissionError: health.update('revoked')
-            self._haos_photon_closed = True; self._haos_photon_originals.close(); os.close(lease)
+            self._haos_photon_stopping = True
+            # Keep custody if asynchronous transport shutdown is interrupted;
+            # only a completed stop permits releasing this profile's lease.
+            await stop(immediate=True)
+            try:
+                try: health.update('closed')
+                except PermissionError: health.update('revoked')
+            finally:
+                # Storage failure remains visible, but cannot retain the kernel
+                # lease or original journal after the child has been stopped.
+                self._haos_photon_closed = True
+                try: self._haos_photon_originals.close()
+                finally: os.close(lease)
 
     async def inbound(self, line): return await on_line(self, line)
     for name, method in [('connect', connect), ('disconnect', disconnect), ('close', close), ('_on_inbound_line', inbound),

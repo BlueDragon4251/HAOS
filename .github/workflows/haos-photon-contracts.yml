@@ -63,7 +63,7 @@ jobs:
       - name: Actual native TLS HTTP protobuf gRPC and durable ingress under the private UID
         run: |
           set -euo pipefail
-          for fixture_case in normal dedicated health-withdraw http401 http403 http429 grpc401 grpc429 wrong-line refresh401 refresh429 reply-confirmed reply-restart reply-disconnect reply-reset reply-sql-refusal reply-withdraw media-image media-document media-voice-caf media-truncated media-withdraw media-unapproved media-storage-refusal; do
+          for fixture_case in normal dedicated health-withdraw health-store-refusal http401 http401-status-loss http403 http429 grpc401 grpc429 wrong-line refresh401 refresh429 reply-confirmed reply-restart reply-disconnect reply-reset reply-sql-refusal reply-withdraw media-image media-document media-voice-caf media-truncated media-withdraw media-unapproved media-storage-refusal; do
             docker run --rm --network none --pids-limit 192 --memory 2g \
               -v "$PWD:/repo:ro" -v "$RUNNER_TEMP/photon-installed-runtime/photon:/input/photon:ro" \
               -v "$RUNNER_TEMP/photon-installed-runtime/hermes:/input/hermes:ro" \
@@ -93,6 +93,25 @@ jobs:
             exit 1
           fi
           python -c 'import pathlib,sys; assert "actual profile ignored owner withdrawal" in pathlib.Path(sys.argv[1]).read_text()' "$RUNNER_TEMP/photon-install/prior-blocked-health.log"
+      - name: Prior close must retain the actual lease when its status write fails
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin 10cd78493c3883283c29f1219bfddadee469541e
+          git show 10cd78493c3883283c29f1219bfddadee469541e:linux/haos/haos/gateway_photon_profile.py > "$RUNNER_TEMP/photon-install/prior-storage-profile.py"
+          sha256sum "$RUNNER_TEMP/photon-install/prior-storage-profile.py" > "$RUNNER_TEMP/photon-install/prior-storage-profile.sha256"
+          if docker run --rm --network none --pids-limit 192 --memory 2g \
+              -v "$PWD:/repo:ro" -v "$RUNNER_TEMP/photon-installed-runtime/photon:/input/photon:ro" \
+              -v "$RUNNER_TEMP/photon-installed-runtime/hermes:/input/hermes:ro" \
+              -v "$PWD/upstream/hermes-agent/.venv/lib/python3.11/site-packages:/deps:ro" \
+              -v "$RUNNER_TEMP/photon-install/prior-storage-profile.py:/baseline/profile.py:ro" \
+              -e HAOS_DISPOSABLE_PHOTON_PROFILE=1 \
+              python@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89 \
+              python3 /repo/linux/haos/probes/probe_photon_profile.py --case health-store-refusal \
+              > "$RUNNER_TEMP/photon-install/prior-failed-close.log" 2>&1; then
+            echo 'Prior close unexpectedly released custody despite its failed status write'
+            exit 1
+          fi
+          python -c 'import pathlib,sys; assert "failed status write retained closed-profile lease" in pathlib.Path(sys.argv[1]).read_text()' "$RUNNER_TEMP/photon-install/prior-failed-close.log"
       - uses: actions/upload-artifact@v7
         if: always()
         with:

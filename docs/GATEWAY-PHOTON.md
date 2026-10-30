@@ -31,6 +31,17 @@ bytes, remove other local copies/backups/WAL, or delete the remote message.
 Account login/setup, public activation and broader cursor/auth recovery remain
 unfinished; this is a working recovery path for the prepared private profile.
 
+Profile shutdown now releases the original journal and kernel lease even when
+the final status transaction fails, while preserving the storage exception for
+the caller. It releases custody only after asynchronous transport shutdown has
+completed. Native HTTP401 and injected SQLite-write fixtures exercise both that
+failure and refusal to recreate a lost authentication-status row. The original
+profile journal remembers its status identities separately from the central
+native inbox. Missing or partial status tables, changed/missing remembered rows,
+malformed history and missing/nonfinite account budgets require Owner inspection;
+reopening or rotating the key cannot reset them into a fresh account. No upstream
+connection starts before that persistent provenance check succeeds.
+
 Photon provides managed iMessage transport. It does not require the Owner to
 operate a Mac relay. Actual account entitlement, a provisioned project, assigned
 line and external delivery require a later account-specific acceptance. Shared

@@ -13,7 +13,7 @@ TERMINAL = frozenset({'authentication-refused', 'identity-refused', 'cursor-refu
 
 
 class Ledger:
-    def __init__(self, inbox, connector, value, publication, current):
+    def __init__(self, inbox, connector, value, publication, current, *, profile=None):
         if not callable(current): raise PermissionError('current independent Photon authority required')
         current(); value = credentials(value); self.current = current; self.db = inbox.db
         self.account = scope(value)
@@ -21,11 +21,49 @@ class Ledger:
         # credential. They must not re-enable the same refused key.
         self.credential = digest([value['project_id'], value['project_secret'], value['phone']])
         self.identity = digest([self.account, self.credential, connector, publication])
+        expected = {'photon_profile_status', 'photon_account_budget'}
+        tables = {row[0] for row in self.db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('photon_profile_status','photon_account_budget')")}
+        if tables and tables != expected:
+            raise Conflict('Photon status schema is incomplete; preserve and inspect it')
+        if not tables and profile is not None and self.db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name IN ('photon_output_intents','photon_native_projection') LIMIT 1").fetchone():
+            raise Conflict('Photon status history is missing beside retained native records')
+        remember = False
+        if profile is not None:
+            profile.current()
+            # This second FULL journal remembers that a concrete profile once
+            # required a status row. Missing rows/tables cannot become a fresh
+            # identity merely by reopening the central native inbox.
+            profile.db.execute('''CREATE TABLE IF NOT EXISTS photon_health_profiles(
+                id TEXT PRIMARY KEY,account_scope TEXT NOT NULL,credential_scope TEXT NOT NULL)''')
+            remembered = profile.db.execute('SELECT * FROM photon_health_profiles LIMIT 65537').fetchall()
+            if len(remembered) > 65536: raise Conflict('Photon status provenance history capacity exceeded')
+            for row in remembered:
+                if (not tables or row['account_scope'] != self.account or any(not isinstance(row[key], str)
+                        or len(row[key]) != 64 or any(c not in '0123456789abcdef' for c in row[key]) for key in ['id', 'credential_scope'])
+                        or row['id'] == self.identity and row['credential_scope'] != self.credential):
+                    raise Conflict('Photon remembered status provenance is missing or damaged')
+                old = self.db.execute('SELECT account_scope,credential_scope FROM photon_profile_status WHERE id=?', (row['id'],)).fetchone()
+                if old is None or old['account_scope'] != row['account_scope'] or old['credential_scope'] != row['credential_scope']:
+                    raise Conflict('Photon remembered status row is missing or changed')
+            if not any(row['id'] == self.identity for row in remembered):
+                if len(remembered) >= 65536: raise Conflict('Photon status provenance history capacity reached')
+                remember = True
         self.db.execute('''CREATE TABLE IF NOT EXISTS photon_profile_status(
             id TEXT PRIMARY KEY,account_scope TEXT NOT NULL,credential_scope TEXT NOT NULL,
             connector TEXT NOT NULL,status TEXT NOT NULL,updated_at REAL NOT NULL)''')
         self.db.execute('''CREATE TABLE IF NOT EXISTS photon_account_budget(
             account_scope TEXT PRIMARY KEY,next_attempt REAL NOT NULL)''')
+        account_rows = self.db.execute('SELECT status,updated_at FROM photon_profile_status WHERE account_scope=? LIMIT 65537', (self.account,)).fetchall()
+        if (len(account_rows) > 65536 or any(row['status'] not in STATES or type(row['updated_at']) not in {int, float}
+                or not math.isfinite(row['updated_at']) or not 0 <= row['updated_at'] <= 253402300799 for row in account_rows)):
+            raise Conflict('Photon retained status history is damaged or exceeds capacity')
+        budget = self.db.execute('SELECT next_attempt FROM photon_account_budget WHERE account_scope=?', (self.account,)).fetchone()
+        if (account_rows and budget is None or budget is not None and (type(budget[0]) not in {int, float}
+                or not math.isfinite(budget[0]) or not 0 <= budget[0] <= 253402300799)):
+            raise Conflict('Photon original account retry budget is missing or damaged')
+        if self.db.execute('SELECT COUNT(*) FROM photon_profile_status').fetchone()[0] >= 65536 and not self.db.execute(
+                'SELECT 1 FROM photon_profile_status WHERE id=?', (self.identity,)).fetchone():
+            raise Conflict('Photon status history capacity reached; inspected owner recovery required')
         # Auth refusal follows the same credential across publication/connector
         # changes. The rate budget follows the account across key rotation too.
         # Earlier prepared profiles hashed the service list into the credential
@@ -39,6 +77,12 @@ class Ledger:
         self.db.execute('INSERT OR IGNORE INTO photon_account_budget VALUES(?,0)', (self.account,))
         self.db.execute('INSERT OR IGNORE INTO photon_profile_status VALUES(?,?,?,?,?,?)',
             (self.identity, self.account, self.credential, connector, blocked or 'created', time.time()))
+        if remember:
+            # No native connection can begin until construction returns. An
+            # interrupted first initialization therefore cannot lose a real
+            # authentication refusal between these two durable journals.
+            profile.current()
+            profile.db.execute('INSERT INTO photon_health_profiles VALUES(?,?,?)', (self.identity, self.account, self.credential))
 
     def recorded(self):
         row = self.db.execute('SELECT status,updated_at FROM photon_profile_status WHERE id=?', (self.identity,)).fetchone()

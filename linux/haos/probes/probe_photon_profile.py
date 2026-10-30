@@ -17,6 +17,7 @@ from pathlib import Path
 import secrets
 import shutil
 import signal
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -62,7 +63,7 @@ async def worker(directory):
     try:
         connected = await adapter.connect()
         scenario = config['scenario']
-        if scenario not in {'normal', 'dedicated', 'health-withdraw'} and not scenario.startswith(('reply-', 'media-')):
+        if scenario not in {'normal', 'dedicated', 'health-withdraw', 'health-store-refusal'} and not scenario.startswith(('reply-', 'media-')):
             if connected: (root / 'emit').write_text('emit fixture native refusal')
             expected = 'identity-refused' if scenario == 'wrong-line' else 'rate-limited' if scenario.endswith('429') else 'authentication-refused'
             deadline = time.monotonic() + 10
@@ -79,6 +80,24 @@ async def worker(directory):
             assert not any(Path('/tmp').glob('hp-*/control.sock'))
             assert await adapter.connect() is False
             await adapter.close()
+            if scenario == 'http401-status-loss':
+                inbox.db.execute('DELETE FROM photon_profile_status WHERE id=?', (adapter._haos_photon_health.identity,))
+                from haos.gateway import Conflict
+                try: reopened = build(value, parent=parent, connector='phone', policy=current, inbox=inbox)
+                except Conflict: pass
+                else:
+                    await reopened.close()
+                    raise AssertionError('native authentication refusal was recreated as a fresh status')
+                assert inbox.db.execute('SELECT 1 FROM photon_profile_status WHERE id=?', (adapter._haos_photon_health.identity,)).fetchone() is None
+                from haos.gateway_matrix_profile import acquire_lease
+                lease = acquire_lease(next(parent.iterdir())); os.close(lease)
+                await asyncio.sleep(.1)
+                assert json.loads((root / 'counts.json').read_text())['http'] == counts['http']
+                return {'passed': 7, 'scenario': scenario, 'cases': ['actual_native_HTTP401_is_recorded_before_damage',
+                    'actual_Node_stops_after_authentication_refusal', 'no_source_or_parent_delivery', 'same_instance_refusal_cannot_retry',
+                    'reopen_refuses_lost_original_auth_status_without_recreation', 'failed_rebuild_releases_actual_kernel_profile_lease',
+                    'damaged_status_cannot_issue_another_vendor_HTTP_request'], 'counts': counts,
+                    'live_Photon_verified': False, 'controller_IPC_verified': False, 'OS_release_artifact': False}
             reopened = build(value, parent=parent, connector='phone', policy=current, inbox=inbox)
             try: assert await reopened.connect() is False
             finally: await reopened.close()
@@ -90,6 +109,30 @@ async def worker(directory):
                 'counts': counts, 'live_Photon_verified': False, 'controller_IPC_verified': False, 'OS_release_artifact': False}
         assert connected, adapter._haos_photon_health.recorded()
         assert adapter.is_connected
+        if scenario == 'health-store-refusal':
+            inbox.db.execute("CREATE TRIGGER refuse_health_status BEFORE UPDATE ON photon_profile_status BEGIN SELECT RAISE(ABORT,'fixture durable status write refusal'); END")
+            active[0] = False
+            deadline = time.monotonic() + 2
+            while adapter.is_connected:
+                assert time.monotonic() < deadline, 'failed status write prevented actual Node withdrawal'
+                await asyncio.sleep(.01)
+            try: await adapter.close()
+            except sqlite3.IntegrityError: pass  # Failure remains visible to the caller.
+            else: raise AssertionError('actual status write refusal was hidden from close caller')
+            assert adapter._haos_photon_closed, 'failed status write retained closed-profile lease'
+            try: adapter._haos_photon_originals.db.execute('SELECT 1')
+            except sqlite3.ProgrammingError: pass
+            else: raise AssertionError('failed close retained original journal handle')
+            from haos.gateway_matrix_profile import acquire_lease
+            lease = acquire_lease(next(parent.iterdir())); os.close(lease)
+            await adapter.close()  # Already released; never closes another descriptor.
+            assert not any(Path('/tmp').glob('hp-*/control.sock'))
+            assert not observed and relay.db.execute('SELECT COUNT(*) FROM inbox').fetchone()[0] == 0
+            return {'passed': 6, 'scenario': scenario, 'cases': ['actual_SQL_status_write_refusal_does_not_prevent_Node_withdrawal',
+                'close_preserves_storage_failure_for_caller', 'failed_status_write_still_closes_original_journal',
+                'actual_kernel_profile_lease_is_released', 'repeated_close_is_safe', 'no_parent_delivery_or_leftover_native_socket'],
+                'counts': json.loads((root / 'counts.json').read_text()), 'live_Photon_verified': False,
+                'controller_IPC_verified': False, 'OS_release_artifact': False}
         if scenario == 'media-storage-refusal':
             adapter._haos_photon_originals.db.execute("CREATE TRIGGER refuse_decoded_custody BEFORE UPDATE OF normalized ON photon_originals BEGIN SELECT RAISE(ABORT,'fixture durable source write refusal'); END")
         (root / 'emit').write_text('emit fixture frames')
@@ -279,6 +322,9 @@ async def worker(directory):
             'counts': json.loads((root / 'counts.json').read_text()), 'live_Photon_verified': False,
             'controller_IPC_verified': False, 'OS_release_artifact': False}
     finally:
+        if config['scenario'] == 'health-store-refusal':
+            # Dispose only this fixture's injected trigger, after its assertions.
+            inbox.db.execute('DROP TRIGGER IF EXISTS refuse_health_status')
         await adapter.close(); inbox.close(); relay.close()
 
 
@@ -286,7 +332,7 @@ def main():
     if os.geteuid() != 0 or os.getpid() != 1 or os.environ.get('HAOS_DISPOSABLE_PHOTON_PROFILE') != '1':
         raise PermissionError('fresh disposable PID-1 network-disabled profile fixture required')
     scenario = sys.argv[2] if len(sys.argv) == 3 and sys.argv[1] == '--case' else 'normal'
-    if scenario not in {'normal', 'dedicated', 'health-withdraw', 'http401', 'http403', 'http429', 'grpc401', 'grpc429', 'wrong-line', 'refresh401', 'refresh429',
+    if scenario not in {'normal', 'dedicated', 'health-withdraw', 'health-store-refusal', 'http401', 'http401-status-loss', 'http403', 'http429', 'grpc401', 'grpc429', 'wrong-line', 'refresh401', 'refresh429',
             'reply-confirmed', 'reply-restart', 'reply-disconnect', 'reply-reset', 'reply-sql-refusal', 'reply-withdraw'}:
         if scenario not in {'media-image', 'media-document', 'media-voice-caf', 'media-truncated', 'media-withdraw', 'media-unapproved', 'media-storage-refusal'}:
             raise ValueError('finite fixture case required')
@@ -369,7 +415,7 @@ def main():
     config = {'sidecar': str(root / 'hermes/plugins/platforms/photon/sidecar'), 'key': str(directory / 'server.key'),
         'cert': str(directory / 'server.crt'), 'project_id': account['project_id'], 'project_secret': account['project_secret'],
         'native_token': native_token, 'counts': str(directory / 'counts.json'), 'emit': str(directory / 'emit'),
-        'ready': str(directory / 'ready.json'), 'scenario': scenario,
+        'ready': str(directory / 'ready.json'), 'scenario': 'http401' if scenario == 'http401-status-loss' else scenario,
         'reply_source': mid, 'reply_chat': 'any;-;+15550100001', 'reply_receipt': str(uuid.uuid4()), 'write_observed': str(directory / 'write-observed'),
         'media': media, 'download_observed': str(directory / 'download-observed'),
         'frames': [message(1, '+15550100009', str(uuid.uuid4())), approved, approved] if scenario in {'normal', 'dedicated', 'health-withdraw'} or scenario.startswith(('reply-', 'media-')) else []}
