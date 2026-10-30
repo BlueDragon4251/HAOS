@@ -34,6 +34,15 @@ def main():
         provenance['programs'][name]['sha256']=hashlib.sha256((target/name).read_bytes()).hexdigest()
     (target/'source.json').write_text(json.dumps(provenance));(target/'source.json').chmod(0o644)
     sys.path[:0]=[str(code),str(code/'hermes-source'),'/sdk','/repo/linux/haos/runtime']
+    guard='''from haos.gateway_buzz_profile import build
+try:build(None,parent=None,connector=None,policy=None,inbox=None)
+except PermissionError:print('refused-before-optional-SDK')
+else:raise AssertionError('foreign UID entered private Buzz profile')
+'''
+    for uid,gid,groups in [(0,0,[]),(65533,65533,[]),(65534,65534,[0])]:
+        result=subprocess.run([sys.executable,'-c',guard],user=uid,group=gid,extra_groups=groups,
+            env={'PATH':'/usr/bin:/bin','PYTHONPATH':str(code)},capture_output=True,text=True,timeout=5)
+        assert result.returncode==0 and result.stdout=='refused-before-optional-SDK\n' and not result.stderr
     from webhook_tls_fixture import create
     from plugins.platforms.buzz import nostr_auth
     from haos.gateway_buzz import scope
@@ -56,7 +65,7 @@ def main():
     account=private/'account.json';account.write_text(json.dumps(value));account.chmod(0o600);os.chown(account,65534,65534)
     script=root/'worker.py';script.write_text('''import asyncio,json,os,sys
 from pathlib import Path
-from types import MethodType
+from types import MethodType,SimpleNamespace
 from haos.gateway_runtime import require_runtime_identity,prepare_runtime_home
 require_runtime_identity();prepare_runtime_home()
 from haos.gateway import digest
@@ -64,6 +73,8 @@ from haos.gateway_buzz import PreparedBuzzPolicy,scope
 from haos.gateway_buzz_crypto import verify
 from haos.gateway_buzz_cli import Reader,QueryFailed
 from haos.gateway_buzz_history import History
+from haos.gateway_buzz_ingress import install as install_ingress,capture as capture_ingress,dispatch_stored
+from haos.gateway_buzz_profile import build as build_profile
 from haos.gateway_buzz_socket import Transport
 from haos.gateway_buzz_cache import RawEvents
 from haos.gateway_buzz_admission import Refused
@@ -123,6 +134,74 @@ adapter.send_reaction=no_reaction
 transport=Transport(value,current,capture);adapter._open_websocket=transport.open
 async def exercise():
     try:
+        if sys.argv[1] in {'profile','profile-auth','profile-auth-saved'}:
+            profiles=base/'profiles';profiles.mkdir(mode=0o700,exist_ok=True)
+            private_inbox=NativeInbox(base/'profile-native.db',redactor);private_parent=RelayInbox(base/'profile-parent.db',redactor)
+            profile=build_profile(value,parent=profiles,connector='buzz',policy=current,inbox=private_inbox)
+            try:
+                try:build_profile(value,parent=profiles,connector='buzz',policy=current,inbox=private_inbox)
+                except PermissionError:pass
+                else:raise AssertionError('duplicate native identity acquired private lease')
+                from haos.gateway_runtime import adapter_envelope
+                def admit(event):
+                    envelope=adapter_envelope(event,'buzz');assert event.raw_message is None
+                    assert envelope['sender'] in reader.peers() and envelope['scope']==scope(value)
+                    private_parent.admit(current(),'buzz',envelope);return True
+                profile.set_durable_message_handler(admit);profile.set_message_handler(admit)
+                if sys.argv[1]!='profile':
+                    assert await profile.connect() is False
+                    assert profile._haos_health()['status']=='authentication-refused'
+                    print(json.dumps({'profile_authentication_refused':True}),flush=True);return
+                assert await profile.connect(),profile._haos_health()
+                assert profile._haos_health()['status']=='connected-ws'
+                async with asyncio.timeout(20):
+                    while private_parent.db.execute('SELECT COUNT(*) FROM inbox').fetchone()[0]<2:await asyncio.sleep(.05)
+                original_id=json.loads(Path(sys.argv[2]).read_text())['original']['id']
+                assert private_parent.db.execute("SELECT COUNT(*) FROM inbox WHERE json_extract(envelope,'$.message_id')=?",(original_id,)).fetchone()[0]==1
+                print(json.dumps({'profile_ready':True,'lease_refused':True,'actual_private_UID':os.geteuid()}),flush=True)
+                await asyncio.to_thread(sys.stdin.readline)
+                async with asyncio.timeout(5):
+                    while profile._haos_health()['status']!='revoked':await asyncio.sleep(.05)
+                async with asyncio.timeout(5):
+                    while profile._haos_buzz_transport.connections or profile._ws_task is not None:await asyncio.sleep(.05)
+                assert profile._ws_task is None
+                print(json.dumps({'profile_revoked':True,'native_socket_stopped':True}),flush=True)
+            finally:await profile._haos_close();private_inbox.close();private_parent.close()
+            return
+        if sys.argv[1].startswith('decode'):
+            import sqlite3
+            from plugins.platforms.buzz.adapter import hex_to_npub
+            from haos.gateway_runtime import adapter_envelope
+            fixture=json.loads(Path(sys.argv[2]).read_text())
+            adapter._self_npub=hex_to_npub(value['public_key'])
+            adapter._display_name='Old Fixture' if sys.argv[1]=='decode-commit-fail' else 'New Fixture'
+            adapter._haos_native=SimpleNamespace(connector='buzz',policy=current,inbox=inbox)
+            adapter._haos_buzz_check=current;adapter._haos_buzz_value=value;adapter._haos_buzz_raw=originals
+            adapter._haos_buzz_home=base;adapter._haos_buzz_environment={'HERMES_SAFE_MODE':'1'}
+            install_ingress(adapter);admissions=[]
+            def admit(event):
+                envelope=adapter_envelope(event,'buzz');assert envelope['text']=='/status'
+                assert event.raw_message is None and not event.media_urls
+                admissions.append(relay.admit(current(),'buzz',envelope));return True
+            adapter.set_durable_message_handler(admit)
+            selected=fixture['decode_named' if sys.argv[1] in {'decode-commit-fail','decode-commit-recover'} else 'decode_public']
+            assert await capture_ingress(adapter,value['channels'][0],selected)
+            proof=await originals.capture(current(),'buzz',value,json.dumps(selected).encode());key=proof['source_key']
+            if sys.argv[1]=='decode-receipt-fail':
+                originals.db.execute("CREATE TRIGGER failed_decode_receipt BEFORE UPDATE ON buzz_raw_events BEGIN SELECT RAISE(ABORT,'fixture receipt failure'); END")
+            if sys.argv[1]=='decode-commit-fail':
+                inbox.db.execute("CREATE TRIGGER failed_decode_commit BEFORE UPDATE ON native_inbox WHEN NEW.state='committed' BEGIN SELECT RAISE(ABORT,'fixture native commit failure'); END")
+            try:assert await dispatch_stored(adapter,key)
+            except sqlite3.IntegrityError:
+                assert sys.argv[1] in {'decode-receipt-fail','decode-commit-fail'}
+                if sys.argv[1]=='decode-receipt-fail':originals.db.execute('DROP TRIGGER failed_decode_receipt')
+                else:inbox.db.execute('DROP TRIGGER failed_decode_commit')
+            state=inbox.db.execute('SELECT state FROM native_inbox WHERE id=?',(key,)).fetchone()[0]
+            projection=inbox.db.execute('SELECT normalizer,text FROM buzz_native_projection WHERE source_key=?',(key,)).fetchone()
+            assert projection['text']=='/status'
+            if sys.argv[1]=='decode-commit-recover':assert json.loads(projection['normalizer'])['_display_name']=='Old Fixture'
+            print(json.dumps({'native_state':state,'parent_count':relay.db.execute('SELECT COUNT(*) FROM inbox').fetchone()[0],
+                'handler_calls':len(admissions),'raw_receipt':bool(originals.db.execute('SELECT admitted_receipt FROM buzz_raw_events WHERE id=?',(proof['id'],)).fetchone()[0])}),flush=True);return
         if sys.argv[1].startswith('history'):
             import sqlite3
             history=History(base/'history.db',reader,redactor,capture)
@@ -251,14 +330,15 @@ except PermissionError as error:
         {'event':signed(peer_scalar,'ambiguous roots',tags=[['h',channel],['p',public],['e','f'*64,'','root'],['e','e'*64,'','root']]),'reason':'unsupported-content'},
         {'event':signed(peer_scalar,'unapproved voice',tags=[['h',channel],['p',public],['imeta','url '+value['relay_url']+'/media/'+('a'*64)+'.flac','x '+('a'*64),'size 4','m audio/flac','filename voice.flac']]),'reason':'independent-media-consent-required'}]
     fixture=root/'signed-inputs.json';fixture.write_text(json.dumps({'original':event,'alternate':alternate,'negatives':negatives,
+        'decode_public':signed(peer_scalar,'@'+public+' /status'),'decode_named':signed(peer_scalar,'@Old Fixture /status'),
         'receipt_failure':signed(peer_scalar,'Local receipt recovery source')}));fixture.chmod(0o644)
     profile=signed(peer_scalar,json.dumps({'display_name':'Peer Fixture'}),0)
     same_second=int(time.time())
     history_events=[signed(peer_scalar,'Same-second fixture history '+str(index),created_at=same_second) for index in range(121)]
-    cases=[]
+    cases=['actual_root_agent_UID_and_gateway_with_supplementary_root_group_are_refused_before_optional_native_SDK_import_or_credential_parsing_in_private_profile_factory']
     async def exercise():
         from aiohttp import web
-        mode={'name':'receive'};auths=[];subscriptions=[];escapes=[];active=[];queries=[]
+        mode={'name':'receive'};auths=[];subscriptions=[];escapes=[];active=[];queries=[];query_auth=[]
         def verified(event):
             result=subprocess.run([str(target/'haos-buzz-verify')],input=json.dumps(event),text=True,capture_output=True,timeout=5)
             assert result.returncode==0 and json.loads(result.stdout)['valid'] is True
@@ -269,9 +349,10 @@ except PermissionError as error:
                 tags={tag[0]:tag[1] for tag in auth['tags'] if len(tag)==2}
                 assert auth['kind']==27235 and auth['pubkey']==public and tags['u']==value['relay_url']+'/query'
                 assert tags['method']=='POST' and tags['payload']==hashlib.sha256(body).hexdigest()
-                selection=json.loads(body);queries.append(selection)
+                selection=json.loads(body);queries.append(selection);query_auth.append(auth['id'])
                 assert isinstance(selection,list) and len(selection)==1
-                if mode['name']=='reader-auth':return web.json_response({'error':'not channel members '+scalar},status=401)
+                if mode['name'] in {'reader-auth','profile-auth'}:return web.json_response({'error':'not channel members '+scalar},status=401)
+                if mode['name']=='reader-rate':return web.json_response({'error':'rate limited fixture'},status=429)
                 if mode['name']=='reader-reflect':return web.json_response([signed(scalar,json.dumps({'display_name':scalar}),0)])
                 if mode['name']=='reader-identity':return web.json_response([profile])
                 if selection[0]['kinds']==[0]:
@@ -299,7 +380,7 @@ except PermissionError as error:
             if mode['name']=='auth-refuse':await socket.close();return socket
             first=await socket.receive_json();second=await socket.receive_json();subscriptions.extend([first,second])
             assert first[0]=='REQ' and first[2]['#h']==[channel] and second[2]['#p']==[public]
-            if mode['name']=='receive':
+            if mode['name'] in {'receive','profile'}:
                 await socket.send_json(['EVENT',first[1],unknown]);await socket.send_json(['EVENT',first[1],event]);await socket.send_json(['EVENT',first[1],event])
             async for message in socket:
                 if message.type==web.WSMsgType.TEXT:subscriptions.append(json.loads(message.data))
@@ -323,9 +404,13 @@ except PermissionError as error:
             mode['name']='reader';before=len(queries);process=spawn('reader')
             assert await line(process)=={'reader_verified':True};await done(process);assert len(queries)==before+3
             cases.append('actual_private_UID_fixed_official_CLI_rejects_writes_unknown_peers_channels_and_duplicate_flags_before_HTTP_and_filters_native_discovery_to_owner_channels')
-            for name,category in [('reader-auth','authentication_refused'),('reader-reflect','private_reflection'),('reader-identity','identity_mismatch')]:
+            for name,category in [('reader-auth','authentication_refused'),('reader-rate','rate_limited'),('reader-reflect','private_reflection'),('reader-identity','identity_mismatch')]:
                 mode['name']=name;before=len(queries);process=spawn(name)
-                assert await line(process)=={'query_failed':category};await done(process);assert len(queries)==before+1
+                assert await line(process)=={'query_failed':category};await done(process)
+                attempts=3 if name=='reader-rate' else 1
+                assert len(queries)==before+attempts
+                if name=='reader-rate':
+                    assert queries[-3:]==[queries[-1]]*3 and len(set(query_auth[-3:]))==3
             cases.append('actual_official_CLI_auth_refusal_is_sticky_without_retry_or_empty_history_and_reflected_private_material_or_wrong_public_identity_never_reaches_native_adapter')
             mode['name']='receive'
             process=spawn('receive');assert await line(process)=={'ready':True,'uid':65534}
@@ -352,6 +437,16 @@ except PermissionError as error:
             mode['name']='history-malformed';process=spawn('history-malformed')
             assert await line(process)=={'malformed_failed':True,'raw_count':123};await done(process)
             cases.append('actual_native_CLI_rejects_malformed_HTTP_history_without_false_empty_list_or_completed_sweep_and_saved_cursor_remains_unchanged')
+            mode['name']='receive'
+            for action,expected in [('decode-receipt-fail',{'native_state':'committed','parent_count':3,'handler_calls':1,'raw_receipt':False}),
+                    ('decode-receipt-recover',{'native_state':'committed','parent_count':3,'handler_calls':0,'raw_receipt':True}),
+                    ('decode-commit-fail',{'native_state':'pending','parent_count':4,'handler_calls':1,'raw_receipt':False})]:
+                process=spawn(action);assert await line(process)==expected;await done(process)
+            await asyncio.sleep(2.1)
+            process=spawn('decode-commit-recover')
+            assert await line(process)=={'native_state':'committed','parent_count':4,'handler_calls':1,'raw_receipt':True};await done(process)
+            cases.append('actual_native_text_MessageEvent_and_independent_parent_relay_admit_strip_public_and_named_mentions_without_exposing_raw_original_or_creating_another_parent_receipt_on_reopen')
+            cases.append('actual_SQL_native_commit_and_original_receipt_failures_reconcile_after_fresh_processes_without_duplicate_parent_admission_and_retain_first_command_projection_across_display_name_change')
             mode['name']='unapproved';before=len(subscriptions);process=spawn('unapproved');assert (await line(process))['ready'] is True
             assert await line(process)=={'unapproved_subscription_refused':True};await done(process)
             assert len(subscriptions)==before+2
@@ -361,6 +456,16 @@ except PermissionError as error:
             cases.append('actual_verified_TLS_WebSocket_302_is_not_followed_and_never_receives_native_authentication')
             mode['name']='auth-refuse';process=spawn('auth-refuse');assert await line(process)=={'transport_refused':True};await done(process)
             cases.append('actual_relay_AUTH_refusal_produces_no_subscription_or_native_message_readiness')
+            mode['name']='profile';process=spawn('profile')
+            assert await line(process)=={'profile_ready':True,'lease_refused':True,'actual_private_UID':65534}
+            publish({**config,'publication':'b'*64});process.stdin.write('withdrawn\n');process.stdin.flush()
+            assert await line(process)=={'profile_revoked':True,'native_socket_stopped':True};await done(process)
+            cases.append('actual_private_profile_fixed_CLI_native_NIP42_WSS_durable_parent_admission_identity_lease_and_root_publication_replacement_stop_live_native_socket_without_waiting_for_new_network_input')
+            mode['name']='profile-auth';before=len(queries);process=spawn('profile-auth')
+            assert await line(process)=={'profile_authentication_refused':True};await done(process);assert len(queries)==before+1
+            process=spawn('profile-auth-saved');assert await line(process)=={'profile_authentication_refused':True};await done(process)
+            assert len(queries)==before+1
+            cases.append('actual_401_private_profile_refusal_persists_across_new_UID_processes_and_same_credential_identity_never_retries_or_reports_readiness_after_restart')
             mode['name']='withdraw';process=spawn('withdraw');assert (await line(process))['ready'] is True
             before=len(subscriptions);publish({**config,'bindings':[]});process.stdin.write('withdrawn\n');process.stdin.flush()
             assert await line(process)=={'withdrawal_refused':True};await done(process)
@@ -372,7 +477,8 @@ except PermissionError as error:
     asyncio.run(exercise())
     print(json.dumps({'passed':len(cases),'cases':cases,'actual_UID_TLS_native_auth_subscription_and_MessageEvent':True,
         'actual_FULL_original_native_inbox_and_parent_relay_custody':True,
-        'persistent_profile_history_controller_mission_media_delivery_GUI_or_public_activation':False},indent=2))
+        'actual_private_profile_lease_lifecycle_native_text_and_revocation':True,
+        'production_runtime_factory_root_controller_mission_media_delivery_GUI_or_public_activation':False},indent=2))
 
 
 if __name__=='__main__':main()

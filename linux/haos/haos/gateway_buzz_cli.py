@@ -78,7 +78,16 @@ class Reader:
                 if code==3:self.authentication_refused=True
                 # Relay bodies and native stderr never reach logs, Hermes mention
                 # fallback matching, or a caller. Read failure is never empty history.
-                raise QueryFailed('authentication_refused' if code==3 else 'query_unavailable')
+                category='authentication_refused' if code==3 else 'query_unavailable'
+                if code==2:
+                    try:failure=json.loads(err)
+                    except (ValueError,RecursionError):failure=None
+                    # The native formatter constructs this status prefix; the
+                    # untrusted relay body after it never controls retry verbs.
+                    if (isinstance(failure,dict) and failure.get('error')=='relay_error'
+                            and isinstance(failure.get('message'),str) and failure['message'].startswith('relay error 429:')):
+                        category='rate_limited'
+                raise QueryFailed(category)
             from .gateway_line_ingress import _object
             from .gateway_dingtalk_admission import finite
             try:result=json.loads(out,object_pairs_hook=_object,parse_constant=finite)

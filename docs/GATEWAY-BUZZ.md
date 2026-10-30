@@ -155,3 +155,37 @@ a real SQL cursor failure after fifty durable originals, exact page replay and
 malformed HTTP history without a false completed scan. Nine separate actual
 CLI/TLS cases pass. These do not establish full profile/controller/media/GUI
 integration, outbound delivery or public activation.
+
+## Private native text profile (still outside the runtime factory)
+
+The private profile now combines the actual pinned adapter's NIP-42 connection,
+bounded Reader, guarded WSS, FULL originals, history and independent native
+inbox. One actual kernel lease covers a relay/public identity across connector
+IDs. Its home, credentials, channel set, publication and grants are pinned;
+native plugins, unsolicited reactions, arbitrary writes and media shortcuts
+remain unavailable. A live monitor checks publication even when the relay is
+idle and closes the native socket/tasks after withdrawal. Authentication and
+identity refusal survive a process restart; rate limits have a finite cooldown.
+
+The actual native decoder produces MessageEvents from retained signed sources.
+Its first command projection and exact native mention-normalizer inputs are
+retained before local parent admission. A later display-name change cannot
+alter an already accepted command. Original signed content remains separately
+available for verification. Local/native receipt gaps are reconciled against
+their original source and grant; a lost settled receipt is not silently rebuilt.
+Media sources remain pending for the forthcoming media implementation, without
+being downgraded to text or reported as accepted missions.
+
+Twenty-one disposable process cases now pass, including actual root/foreign UID/
+supplementary-group factory refusal without optional SDKs, compiled CLI retries
+of exactly three read-only 429 queries with fresh NIP-98 nonces, native command
+projection replay, SQL failures on both sides of local admission, private
+identity lease enforcement, an idle socket closed by a real root-owned policy
+replacement, and authentication refusal across fresh UID processes. Minimal and
+full regressions each pass 2,537 tests with the same two existing skips; 172
+actual root/kernel cases pass.
+
+These are private component/profile and local parent-relay receipts. The public
+runtime factory, root controller mission flow, outputs, media/voice, owner GUI,
+recovery decisions, image packaging and CI wiring remain unfinished. Buzz is
+still not counted as the fifteenth completed gateway.
