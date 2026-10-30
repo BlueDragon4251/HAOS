@@ -92,6 +92,30 @@ def test_historical_status_reports_actual_published_grants_as_information_withou
     with pytest.raises(ValueError):response(value,'tokens',policy=selected_policy)
 
 
+def repaired():
+    app=selected()
+    return {'account':app,'active_authorization_returned':False,'result':{'profile':app['profile'],'identity_sha256':app['identity_sha256'],
+        'receipt':'e'*64,'public_identity_restored':True,'network_requested':False,'credentials_changed':False,'private_credentials_returned':False}}
+
+
+def test_identity_repair_receipt_is_exact_original_public_metadata_without_new_credentials_or_api_authority():
+    value=repaired();request={'profile':value['account']['profile'],'identity':value['account']['identity']}
+    assert response(value,'restore-identity',request=request)==value
+    with pytest.raises(ValueError):response(value,'restore-identity',request={**request,'profile':'google-chat-'+'f'*64})
+    with pytest.raises(ValueError):response(value,'restore-identity',request={**request,'identity':{**request['identity'],'bot_user':'users/998'}})
+
+
+@pytest.mark.parametrize('case',['network_requested','credentials_changed','private_credentials_returned','active_authorization_returned','foreign-profile','foreign-identity','private-field'])
+def test_identity_repair_cannot_replace_original_identity_or_return_secrets_network_or_authorization(case):
+    value=repaired();result=value['result']
+    if case in {'network_requested','credentials_changed','private_credentials_returned'}:result[case]=True
+    elif case=='active_authorization_returned':value[case]=True
+    elif case=='foreign-profile':result['profile']='google-chat-'+'f'*64
+    elif case=='foreign-identity':result['identity_sha256']='f'*64
+    else:result['service_account']={'private_key':'must-not-return'}
+    with pytest.raises(ValueError):response(value,'restore-identity')
+
+
 @pytest.mark.parametrize('case',['foreign-scope','foreign-project','api-use','verified','private-client','private-payload'])
 def test_historical_rejected_token_metadata_cannot_claim_verified_user_api_authority_or_private_client_material(case):
     # Actual capsule construction is covered by existing SQLite tests; this

@@ -18,6 +18,7 @@ try:
  elif action=='quarantines':result=owner.quarantines(**params)
  elif action=='dispose':result=owner.dispose(**params)
  elif action=='revoke':result=owner.revoke(**params)
+ elif action=='restore':result=owner.restore_identity(**params)
  elif action=='hold':
   import subprocess
   from haos.google_chat_retired_process import command
@@ -58,6 +59,19 @@ except PermissionError:print(json.dumps({'error':'root-backend-authority-refused
     site=runtime/'lib/python3.11/site-packages/fixture.pth';installed=site.read_text()
     site.write_text('/usr/lib/haos\n')
     try:
+        marker=database.parent/'account-identity.json';original=marker.read_bytes();marker.unlink()
+        missing=call('profiles');assert missing['profiles']==[] and missing['identity_missing']==[account['profile']] and requests==before
+        params={'profile':account['profile'],'identity':account['identity'],'note':'explicit original public identity metadata recovery','confirmed':True}
+        assert call('restore',{**params,'confirmed':False})=={'error':'root-backend-authority-refused'} and not marker.exists()
+        changed={**account['identity'],'bot_user':'users/998'}
+        assert call('restore',{**params,'identity':changed})=={'error':'root-backend-authority-refused'} and not marker.exists()
+        repaired=call('restore',params)
+        assert repaired['account']==account and repaired['active_authorization_returned'] is False
+        assert repaired['result']['public_identity_restored'] and repaired['result']['credentials_changed'] is False
+        assert not repaired['result']['network_requested'] and marker.read_bytes()==original and requests==before
+        assert call('restore',params)==repaired and marker.read_bytes()==original and requests==before
+        cases.append('actual_Root_original_public_identity_hash_restores_missing_legacy_marker_without_service_account_key_optional_SDK_Hermes_network_new_tokens_or_grants_and_is_idempotent')
+        cases.append('actual_Root_identity_repair_refuses_missing_confirmation_or_other_original_bot_identity_before_creating_metadata')
         assert call('profiles')['profiles']==[account]
         assert call('quarantines',{'profile':account['profile']})['result']['quarantines'][0]['id']==capsule['id']
         assert call('tokens',{'profile':account['profile']})['result']['tokens'][0]['id']==row['id'] and requests==before
@@ -70,7 +84,8 @@ except PermissionError:print(json.dumps({'error':'root-backend-authority-refused
     child=subprocess.run(command(),input='{}',capture_output=True,text=True,timeout=15,user=65534,group=65534,extra_groups=[],cwd=str(code),env=env)
     assert child.returncode!=0 and 'live authenticated Root' in child.stderr
     denied='''from haos import google_chat_retired_setup as owner
-for action in [lambda:owner.profiles(),lambda:owner.tokens('bad'),lambda:owner.revoke({}, {}, 'fixture',confirmed=True)]:
+for action in [lambda:owner.profiles(),lambda:owner.tokens('bad'),lambda:owner.revoke({}, {}, 'fixture',confirmed=True),
+ lambda:owner.restore_identity('bad',{},'fixture',confirmed=True)]:
  try:action()
  except PermissionError:pass
  else:raise AssertionError('private UID entered Root historical backend')
@@ -86,14 +101,19 @@ print('denied')
     try:
         assert held.stdout.readline()=='locked\n'
         assert call('tokens',{'profile':account['profile']})=={'error':'authority-refused'} and requests==before
+        assert call('restore',{'profile':account['profile'],'identity':account['identity'],
+            'note':'active profile holder must block metadata repair','confirmed':True})=={'error':'authority-refused'} and requests==before
     finally:held.terminate();held.wait(timeout=5)
     identity_file=database.parent/'account-identity.json';saved_identity=identity_file.read_bytes()
     try:
         invalid=json.loads(saved_identity);invalid['bot_user']='users/998';identity_file.write_text(json.dumps(invalid))
         assert call('tokens',{'profile':account['profile']})=={'error':'authority-refused'} and requests==before
+        assert call('restore',{'profile':account['profile'],'identity':account['identity'],
+            'note':'damaged existing metadata must not be overwritten','confirmed':True})=={'error':'authority-refused'} and requests==before
         assert identity_file.read_bytes()!=saved_identity
     finally:identity_file.write_bytes(saved_identity)
     cases.append('actual_historical_worker_kernel_profile_flock_and_changed_private_identity_block_status_or_withdrawal_without_network_or_automatic_identity_repair')
+    cases.append('actual_Root_identity_restore_obeys_live_kernel_profile_lease_and_preserves_existing_damaged_identity_instead_of_repairing_or_replacing_it')
     import time
     parent=subprocess.Popen(['/usr/local/bin/python3',str(helper)],stdin=subprocess.PIPE,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,
         cwd=str(code),env=env,text=True)

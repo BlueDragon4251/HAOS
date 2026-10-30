@@ -1,0 +1,168 @@
+{
+  "recorded_UTC": "2026-10-30T17:42:57.183614+00:00",
+  "base_commit": "dc3cf5cb33c95af3e64027b4a30c2dd68e3a2d64",
+  "source_files": [
+    {
+      "path": "docs/GATEWAY-GOOGLE-CHAT.md",
+      "sha256": "62b1b2b1571c0bdeeaf7bdd2f8021f41f9e7169bd52c2737e9e3d512a0522d7f"
+    },
+    {
+      "path": "linux/haos/haos/gateway_google_chat_identity.py",
+      "sha256": "0a1675311ad5a5c73eae40eec79de39ec58c74cf4be376688e66881b0705bf2a"
+    },
+    {
+      "path": "linux/haos/haos/google_chat_retired_cli.py",
+      "sha256": "906ccd0cadf901b51243c2ef56fe1dfb8a6af9b2cc5d23c4c0c0c006c3850c95"
+    },
+    {
+      "path": "linux/haos/haos/google_chat_retired_gui.py",
+      "sha256": "638456e2ea8bde7cb0d3ee66aaac390c0f75ca9e2b86142185b39ec042f51846"
+    },
+    {
+      "path": "linux/haos/haos/google_chat_retired_process.py",
+      "sha256": "0881f663fc6eaf7c8fcbcfd91b9d122201370178cacb65459987179726c80606"
+    },
+    {
+      "path": "linux/haos/haos/google_chat_retired_setup.py",
+      "sha256": "83ae4b45782333a060c0ff2b2ba31e4c1f0adc12877ff4925b573656dd23d26e"
+    },
+    {
+      "path": "linux/haos/haos/google_chat_retired_worker.py",
+      "sha256": "e9912776be212664c9720ee67c4f70964195f61b244d19e716965dad21fb763d"
+    },
+    {
+      "path": "linux/haos/runtime/google_chat_retired_fixture.py",
+      "sha256": "28c7a57cf50bd8b233a7e5d994e5454937076066675546f87853b39ee2df5911"
+    },
+    {
+      "path": "linux/haos/runtime/probe_google_chat_retired_gui.py",
+      "sha256": "a50e62ae0a05dcf42a77593bd3a870da22aa7d512c9df7eaf7a25de5aaf32449"
+    },
+    {
+      "path": "linux/haos/tests/test_google_chat_retired_cli.py",
+      "sha256": "772726d943d9e6c2a858d2735c768eb1cdcdee4a1a5f5b32f0de32bb21ed02fe"
+    },
+    {
+      "path": "linux/haos/tests/test_google_chat_retired_process.py",
+      "sha256": "05d106784a024854e3c3a1ec074e3b4d627d42eb6223a313cbdb0dc8ebc86d62"
+    }
+  ],
+  "minimal_no_Hermes_source": {
+    "passed": 3017,
+    "existing_skips": 2
+  },
+  "frozen_Hermes_source": {
+    "passed": 3017,
+    "existing_skips": 2
+  },
+  "actual_Root_kernel": {
+    "passed": 174,
+    "new_skips_or_kernel_mocks": false
+  },
+  "actual_identity_filesystem_UID_probe": {
+    "cases": [
+      "actual_Root_agent_UID_and_supplementary_Root_group_denied_before_optional_SDK",
+      "actual_private_UID_creates_atomic_public_identity_for_existing_SQLite_profile_without_changing_journal_and_without_private_key_or_transport_material",
+      "actual_private_UID_key_rotation_and_transport_change_preserve_public_app_identity_bytes_inode_and_timestamp",
+      "actual_private_UID_refuses_other_app_for_existing_profile_without_replacing_metadata",
+      "actual_private_UID_widened_identity_refused_and_preserved_without_automatic_repair",
+      "actual_private_UID_hardlink_identity_refused_and_preserved_without_automatic_repair",
+      "actual_private_UID_symlink_identity_refused_and_preserved_without_automatic_repair",
+      "actual_private_UID_truncated_identity_refused_and_preserved_without_automatic_repair",
+      "actual_private_UID_changed_identity_refused_and_preserved_without_automatic_repair",
+      "actual_private_UID_symlinked_profile_directory_refused_before_metadata_read",
+      "actual_O_EXCL_collision_preserves_preexisting_private_file_and_does_not_publish_descriptor"
+    ],
+    "passed": 11,
+    "optional_SDK_imported": false,
+    "actual_UIDs_filesystem_SQLite_and_immutable_public_identity": true,
+    "live_Google_authentication_or_retired_Owner_UI_acceptance": false
+  },
+  "actual_Root_historical_OAuth_and_original_identity_recovery": {
+    "passed": 20,
+    "cases": [
+      "actual_Root_backend_private_UID_closed_empty_OAuth_inventories_do_not_create_token_database_or_send_network_requests",
+      "actual_Root_first_setup_creates_missing_private_service_state_but_refuses_existing_insecure_or_symlinked_custody_without_chown_chmod_or_deletion",
+      "actual_gateway_UID_cannot_call_five_Root_OAuth_backend_entry_points",
+      "actual_fixed_Owner_worker_ROOT_parent_private_UID_native_Flow_default_Google_TLS_endpoint_RSA_subject_verification_and_FULL_token_acceptance_return_only_closed_receipt",
+      "actual_Root_private_UID_token_status_exposes_only_exact_public_client_scopes_generation_budget_and_snapshot_without_token_readback",
+      "actual_Owner_worker_refuses_wrong_signed_Google_user_and_retains_nonactive_private_capsule_for_historical_cleanup_after_app_removal",
+      "actual_Root_historical_worker_lists_private_public_identity_and_tokens_after_connector_and_service_account_credentials_are_removed_without_fabricating_active_grants_or_requesting_network",
+      "actual_Root_historical_token_metadata_remains_available_with_active_config_and_all_service_account_credentials_absent",
+      "actual_Root_historical_rejected_token_inventory_without_service_account_credentials_exposes_only_nonactive_capsule_metadata_and_never_grants_API_use",
+      "actual_Root_original_public_identity_hash_restores_missing_legacy_marker_without_service_account_key_optional_SDK_Hermes_network_new_tokens_or_grants_and_is_idempotent",
+      "actual_Root_identity_repair_refuses_missing_confirmation_or_other_original_bot_identity_before_creating_metadata",
+      "actual_fixed_Root_private_UID_historical_metadata_with_real_retained_OAuth_tokens_runs_without_optional_SDK_or_Hermes_source_on_runtime_path_and_without_network",
+      "actual_historical_worker_denies_Root_agent_supplementary_Root_group_and_PID1_parent_and_private_UID_cannot_call_Root_backend",
+      "actual_historical_worker_kernel_profile_flock_and_changed_private_identity_block_status_or_withdrawal_without_network_or_automatic_identity_repair",
+      "actual_Root_identity_restore_obeys_live_kernel_profile_lease_and_preserves_existing_damaged_identity_instead_of_repairing_or_replacing_it",
+      "actual_historical_private_worker_PR_SET_PDEATHSIG_and_NoNewPrivs_stop_the_worker_when_its_authenticated_Root_parent_dies",
+      "actual_Root_historical_withdrawal_requires_explicit_confirmation_exact_app_snapshot_and_no_pending_publication_before_any_HTTP",
+      "actual_Root_historical_rejected_token_disposal_requires_exact_snapshot_confirmation_then_one_fixed_TLS_revocation_before_private_capsule_compaction_and_replay_never_reposts_or_authorizes_API_use",
+      "actual_Root_to_private_UID_historical_revocation_without_service_account_key_commits_local_denial_before_one_fixed_Google_TLS_POST_and_replay_returns_original_audited_receipt_without_new_IO",
+      "real_Root_and_private_credential_audits_persist_actor_and_receipts_without_secret_material_or_external_chat_message_requests"
+    ],
+    "actual_Root_backend_fixed_worker_private_UID_RSA_PKCE_default_HTTPS_and_FULL_SQLite": true,
+    "systemctl_state_is_explicit_fixture": true,
+    "Google_DNS_and_CA_are_substituted_only_in_disposable_network_none_namespace": true,
+    "service_account_schema_only_for_user_OAuth_component": true,
+    "live_Google_account_installed_Owner_login_GUI_or_public_activation": false
+  },
+  "actual_Tk_controls": {
+    "desktop": {
+      "passed": 12,
+      "cases": [
+        "actual_Tk_known_and_unknown_app_profiles_are_distinct_and_selection_requires_fresh_metadata",
+        "actual_Tk_tokens_requires_explicit_snapshot_note_and_consent_then_validates_decision_receipt",
+        "actual_Tk_quarantines_requires_explicit_snapshot_note_and_consent_then_validates_decision_receipt",
+        "actual_Tk_outputs_requires_explicit_snapshot_note_and_consent_then_validates_decision_receipt",
+        "actual_Tk_unassociated-outputs_requires_explicit_snapshot_note_and_consent_then_validates_decision_receipt",
+        "actual_Tk_active_original_grant_blocks_local_byte_disposal",
+        "actual_Tk_profile_change_clears_old_snapshot_and_consent_before_any_withdrawal",
+        "actual_async_Tk_discards_slow_metadata_after_profile_change",
+        "actual_Tk_closed_metadata_schema_rejects_private_payload_before_rendering",
+        "actual_Tk_rejects_decision_receipt_for_a_different_token",
+        "actual_Tk_original_public_identity_repair_requires_current_fields_note_consent_and_metadata_only_receipt_and_clears_afterward",
+        "actual_Wizard_history_page_constructs_real_recovery_controls_and_return_navigation_without_active_connector"
+      ],
+      "screen": [
+        1440,
+        1000
+      ],
+      "actual_Tk_component_async_queue_and_read_only_details": true,
+      "privileged_backend_responses_are_explicit_fixtures": true,
+      "live_Google_account_installed_GUI_or_public_activation": false
+    },
+    "compact": {
+      "passed": 12,
+      "cases": [
+        "actual_Tk_known_and_unknown_app_profiles_are_distinct_and_selection_requires_fresh_metadata",
+        "actual_Tk_tokens_requires_explicit_snapshot_note_and_consent_then_validates_decision_receipt",
+        "actual_Tk_quarantines_requires_explicit_snapshot_note_and_consent_then_validates_decision_receipt",
+        "actual_Tk_outputs_requires_explicit_snapshot_note_and_consent_then_validates_decision_receipt",
+        "actual_Tk_unassociated-outputs_requires_explicit_snapshot_note_and_consent_then_validates_decision_receipt",
+        "actual_Tk_active_original_grant_blocks_local_byte_disposal",
+        "actual_Tk_profile_change_clears_old_snapshot_and_consent_before_any_withdrawal",
+        "actual_async_Tk_discards_slow_metadata_after_profile_change",
+        "actual_Tk_closed_metadata_schema_rejects_private_payload_before_rendering",
+        "actual_Tk_rejects_decision_receipt_for_a_different_token",
+        "actual_Tk_original_public_identity_repair_requires_current_fields_note_consent_and_metadata_only_receipt_and_clears_afterward",
+        "actual_Wizard_history_page_constructs_real_recovery_controls_and_return_navigation_without_active_connector"
+      ],
+      "screen": [
+        390,
+        640
+      ],
+      "actual_Tk_component_async_queue_and_read_only_details": true,
+      "privileged_backend_responses_are_explicit_fixtures": true,
+      "live_Google_account_installed_GUI_or_public_activation": false
+    }
+  },
+  "public_identity_only_no_credential_or_grant_creation": true,
+  "accepted_gateway_count": 15,
+  "not_claimed": [
+    "live Google account entitlement or external delivery",
+    "installed GUI/systemd/OS acceptance",
+    "release or completed full Google acceptance"
+  ]
+}

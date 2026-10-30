@@ -65,6 +65,12 @@ def main():
     owner.dispose=lambda app,row,note,**kw:decide('quarantines',app,row,note,**kw)
     owner.purge_output=lambda app,row,note,**kw:decide('outputs',app,row,note,**kw)
     owner.purge_unassociated_output=lambda row,note,**kw:decide('unassociated-outputs',None,row,note,**kw)
+    def restore(profile,identity,note,**options):
+        assert profile==account['profile'] and identity==account['identity'] and note.strip() and options=={'confirmed':True}
+        calls.append(('restore',profile,deepcopy(identity)))
+        return {'account':account,'active_authorization_returned':False,'result':{'profile':profile,'identity_sha256':account['identity_sha256'],
+            'receipt':'6'*64,'public_identity_restored':True,'network_requested':False,'credentials_changed':False,'private_credentials_returned':False}}
+    owner.restore_identity=restore
     wizard=Wizard(tk)
     for child in wizard.content.winfo_children():child.destroy()
     form=gui.HistoricalRecoveryForm(wizard,wizard.content);form.frame.pack(fill='x');wizard.root.update();cases=[]
@@ -98,6 +104,15 @@ def main():
         mode['private']=False;cases.append('actual_Tk_closed_metadata_schema_rejects_private_payload_before_rendering')
         load('tokens');select();consent();mode['wrong']=True;form.buttons['withdraw'].invoke();settle()
         assert not form.rows and 'verworfen' in wizard.status.cget('text');cases.append('actual_Tk_rejects_decision_receipt_for_a_different_token')
+        mode['wrong']=False
+        for key,var in form.identity_vars.items():var.set(account['identity'][key])
+        before=len(calls);form.buttons['restore'].invoke();settle();assert len(calls)==before
+        consent();form.identity_vars['bot_user'].set('users/998');assert not form.confirm.get()
+        form.buttons['restore'].invoke();settle();assert len(calls)==before
+        form.identity_vars['bot_user'].set(account['identity']['bot_user']);consent();form.buttons['restore'].invoke();settle()
+        assert calls[-1]==('restore',account['profile'],account['identity']) and not form.confirm.get()
+        assert all(not var.get() for var in form.identity_vars.values()) and 'unverändert' in wizard.status.cget('text')
+        cases.append('actual_Tk_original_public_identity_repair_requires_current_fields_note_consent_and_metadata_only_receipt_and_clears_afterward')
         wizard.show('google-chat-history');wizard.root.update()
         def labels(widget):
             result=[widget.cget('text')] if isinstance(widget,(tk.Label,tk.Button,tk.Checkbutton)) else []

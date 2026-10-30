@@ -42,6 +42,25 @@ def profiles():
     require_root();return _invoke('profiles',{})
 
 
+def restore_identity(profile,identity,note,*,confirmed=False):
+    from .initial_setup import require_root
+    require_root()
+    from .gateway_google_chat_identity import validate,account_scope
+    from .gateway_google_chat_recovery import profile_name
+    from .gateway import digest
+    from .owner import audit
+    identity=validate(identity);profile=profile_name(profile)
+    if profile!='google-chat-'+digest(account_scope(identity)):
+        raise PermissionError('öffentliche Original-App-Identität passt nicht zum erhaltenen Profil; nichts wird ersetzt')
+    if confirmed is not True or not isinstance(note,str) or not 1<=len(note.strip())<=2000:
+        raise PermissionError('exakte ursprüngliche öffentliche Identität prüfen, begründen und ausdrücklich bestätigen')
+    params={'profile':profile,'identity':identity,'owner_uid':int(os.environ.get('SUDO_UID','0')),
+        'note_sha256':hashlib.sha256(note.strip().encode()).hexdigest(),'confirmed':True}
+    # A durable Root intent precedes even this non-authorizing metadata write.
+    audit('gateway.google-chat-historical-identity-intent',{'profile':profile,'identity_sha256':digest(identity),'note_sha256':params['note_sha256']})
+    return _invoke('restore-identity',params)
+
+
 def tokens(profile):
     from .initial_setup import require_root
     require_root()

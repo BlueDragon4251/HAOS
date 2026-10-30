@@ -17,6 +17,13 @@ class HistoricalRecoveryForm:
             'werden ausdrücklich als unbekannt angezeigt.',size=10,color=wizard.MUTED).pack(anchor='w',pady=5)
         self.profile=wizard._field(self.frame,'Erhaltenes Google-Chat-Profil')
         self.profile_var=tk.StringVar();self.profile.configure(textvariable=self.profile_var);self.profile_var.trace_add('write',self.clear)
+        self.identity_vars={}
+        wizard._label(self.frame,'Nur bei fehlender alter App-Metadatei: ursprüngliche öffentliche Werte eingeben. '
+            'Ihr Hash muss exakt dem erhaltenen Profil entsprechen; keine neuen Namen, Schlüssel oder API-Freigaben.',size=10,color=wizard.MUTED).pack(anchor='w',pady=5)
+        for key,label in [('project_id','Ursprüngliche öffentliche Google-Projekt-ID'),('service_account_email','Ursprüngliche Service-Konto-E-Mail'),
+                ('bot_user','Ursprünglicher numerischer Bot: users/<ID>')]:
+            entry=wizard._field(self.frame,label);var=tk.StringVar();entry.configure(textvariable=var);self.identity_vars[key]=var
+            var.trace_add('write',self.identity_changed)
         for kind,label in [('profiles','Erhaltene Konten auflisten'),('tokens','Nutzerfreigaben prüfen'),
                 ('quarantines','Abgelehnte Zugangsdaten prüfen'),('outputs','Lokale Konto-Ausgaben prüfen'),
                 ('unassociated-outputs','Unzugeordnete lokale Ausgaben prüfen')]:
@@ -30,6 +37,7 @@ class HistoricalRecoveryForm:
             bg=wizard.PANEL,fg=wizard.TEXT,selectcolor=wizard.BG,wraplength=wizard.label_wrap,justify='left').pack(anchor='w',pady=4)
         self.button('withdraw','Ausgewählte Nutzerfreigabe oder Quarantäne widerrufen',self.withdraw)
         self.button('purge','Ausgewählte lokale Ausgabebytes entsorgen',self.purge)
+        self.button('restore','Exakte ursprüngliche öffentliche App-Metadaten wiederherstellen',self.restore)
         wizard._label(self.frame,'Widerruf sperrt zuerst lokal und kann Google kontaktieren; er versendet keine Nachricht. '
             'Ein unklarer Widerruf wird nicht automatisch wiederholt. Lokale Ausgaben lassen sich erst nach Entzug '
             'der ursprünglichen Freigabe entsorgen. Prüfbelege bleiben; entfernte Nachrichten, WAL und Backups '
@@ -49,7 +57,12 @@ class HistoricalRecoveryForm:
 
     def clear(self,*_args):
         self.epoch+=1;self.rows=[];self.kind=None;self.account=None;self.loaded_profile=None
+        for variable in getattr(self,'identity_vars',{}).values():variable.set('')
         if hasattr(self,'list'):self.list.delete(0,self.wizard.tk.END);self.render(None);self.reset_consent()
+
+    def identity_changed(self,*_args):
+        self.epoch+=1
+        if hasattr(self,'confirm'):self.reset_consent()
 
     def fresh(self,epoch,profile):
         return epoch==self.epoch and profile==self.profile_var.get().strip() and bool(self.frame.winfo_exists())
@@ -124,3 +137,20 @@ class HistoricalRecoveryForm:
 
     def withdraw(self):self.perform({'tokens','quarantines'})
     def purge(self):self.perform({'outputs','unassociated-outputs'})
+
+    def restore(self):
+        w=self.wizard
+        if w.running:return
+        profile=self.profile_var.get().strip();identity={'version':1,**{key:var.get().strip() for key,var in self.identity_vars.items()}}
+        note=self.note.get().strip()
+        if self.confirm.get() is not True or not profile or not 1<=len(note)<=2000:
+            w.status.configure(text='Ursprüngliche öffentliche Identität für genau dieses erhaltene Profil prüfen, begründen und bestätigen.');return
+        epoch=self.epoch;self.reset_consent();request={'profile':profile,'identity':identity}
+        def done(value):
+            if not self.fresh(epoch,profile):return
+            try:value=response(value,'restore-identity',request=request)
+            except (ValueError,TypeError,KeyError):
+                self.clear();w.status.configure(text='Ungültigen Identitätsbeleg verworfen; erhaltenes Profil neu prüfen.');return
+            self.clear();w.status.configure(text=ERRORS[value['error']] if 'error' in value else
+                'Ursprüngliche öffentliche App-Metadaten belegt. Zugangsdaten und Freigaben bleiben unverändert; Belege jetzt neu laden.')
+        w._run_async(lambda:owner.restore_identity(profile,identity,note,confirmed=True),result_handler=done)

@@ -82,8 +82,8 @@ local relay handoff, not a root-controller mission or live inference.
 
 ## Remaining acceptance
 
-- Complete historical missing-identity recovery without guessing original app
-  names or replacing existing custody. Known-identity token/quarantine/output
+- Finish native account/status management review and the remaining acceptance
+  checks. Original-identity restoration, known-identity token/quarantine/output
   cleanup and global unassociated output cleanup are implemented below.
 - Finish source-consistent public-path validation and account/status management
   review. Actual production-loop tests now cover both transports, Root policy,
@@ -753,6 +753,36 @@ can contact the fixed Google revocation endpoint after durable local denial;
 it does not send a chat message. An uncertain remote result remains uncertain.
 Local output disposal refuses any active original grant and preserves audit
 tombstones. Missing legacy app identity still prevents account-specific token
-withdrawal; it never triggers guessed identity or credential reconstruction.
-Public account enrollment, pairing and production activation remain separate
-unfinished work. The public software count remains 15/22.
+withdrawal until explicit original-identity restoration succeeds; it never
+triggers guessed identity or credential reconstruction. Public-path acceptance
+and status management review continue. The accepted software count stays 15/22.
+
+## Missing legacy public identity
+
+If an older profile has no `account-identity.json`, the Owner can supply the
+**original** public project ID, service-account email and numeric bot resource in
+the historical recovery page. The same operation is available as
+`gateway google-chat-retired restore-identity --profile ... --project-id ...
+--service-account-email ... --bot-user ... --note ... --confirm-inspected`.
+No private service-account JSON or token is requested.
+
+The public fields must produce the exact original stable account scope and
+double-hashed retained profile name. A different app, alias or bot is refused
+before writing. Root records a durable intent, quiesces the gateway and uses
+the existing authenticated private worker and actual profile lease. The
+non-replacing, fsynced descriptor writer preserves existing malformed metadata,
+symlinks, hardlinks, permissions and custody rather than attempting repairs.
+An existing matching descriptor is idempotent. No profile is created by this
+procedure, and no keys, tokens, API capabilities or active sender grants change.
+After restoration, fresh historical token/quarantine/output inspection and
+separate explicit withdrawal decisions remain mandatory. If the original public
+values are unknown, preserve the opaque profile and obtain them from the Owner's
+original project records; HAOS does not guess or infer an account.
+
+The actual Root/private-UID process fixture removes only its disposable legacy
+marker after real SDK enrollment and removes all active connector/key/config
+data. Metadata restoration and subsequent historical inspection work with SDK
+and Hermes imports hidden. Missing consent, a foreign bot, a held kernel lease
+and an already damaged descriptor are refused. No network request accompanies
+identity restoration. Tk and CLI use the same Root backend and invalidate prior
+consent when the public identity or selected profile changes.

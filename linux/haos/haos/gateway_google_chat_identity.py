@@ -63,6 +63,12 @@ def _encoded(value):return (json.dumps(value,sort_keys=True,separators=(',',':')
 def remember(profile,account):
     """After the profile lease/current Root validation; preserve existing records."""
     profile=_directory(profile);value=descriptor(account)
+    return remember_identity(profile,value)
+
+
+def remember_identity(profile,identity):
+    """Public metadata only; exact original profile hash, never API authority."""
+    profile=_directory(profile);value=validate(identity)
     if profile.name!='google-chat-'+digest(account_scope(value)):
         raise PermissionError('public Google identity must match its original private profile')
     try:previous=load(profile)

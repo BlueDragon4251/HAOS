@@ -45,6 +45,13 @@ def main():
                 or params['owner_uid']!=request['owner_uid']
                 or any(not isinstance(params[k],str) or not HEX.fullmatch(params[k]) for k in ['id','snapshot_sha256','note_sha256'])):
             raise PermissionError('closed explicitly confirmed unassociated output decision required')
+    elif action=='restore-identity':
+        from .gateway_google_chat_identity import validate,account_scope
+        if (set(params)!={'profile','identity','owner_uid','note_sha256','confirmed'} or params['confirmed'] is not True
+                or params['owner_uid']!=request['owner_uid'] or not isinstance(params['note_sha256'],str) or not HEX.fullmatch(params['note_sha256'])):
+            raise PermissionError('explicit original public app identity and authenticated Owner metadata repair required')
+        identity=validate(params['identity']);profile_name(params['profile'])
+        if params['profile']!='google-chat-'+digest(account_scope(identity)):raise PermissionError('original public identity does not match retained profile')
     elif action in {'tokens','quarantines','outputs'}:
         if set(params)!={'profile'}:raise ValueError('one exact historical profile required')
         profile_name(params['profile'])
@@ -109,6 +116,15 @@ def main():
                         rows.append({**row,'snapshot_sha256':digest(row)})
                     finally:os.close(held)
             result={'profiles':rows,'identity_missing':missing,'history_truncated':count>128,'network_requested':False,'private_credentials_returned':False}
+        elif action=='restore-identity':
+            from .gateway_google_chat_identity import remember_identity
+            _directory(profiles);profile=profiles/params['profile'];lease=acquire_lease(profile);current()
+            identity=remember_identity(profile,params['identity']);current()
+            row={'profile':profile.name,'identity':identity,'identity_sha256':digest(identity)}
+            account={**row,'snapshot_sha256':digest(row)}
+            result={'account':account,'active_authorization_returned':False,'result':{'profile':profile.name,'identity_sha256':digest(identity),
+                'receipt':digest(['restore-public-identity',params]),'public_identity_restored':True,'network_requested':False,
+                'credentials_changed':False,'private_credentials_returned':False}}
         else:
             _directory(profiles);profile=profiles/params['profile'];lease=acquire_lease(profile);identity=load(profile)
             row={'profile':profile.name,'identity':identity,'identity_sha256':digest(identity)};account={**row,'snapshot_sha256':digest(row)}

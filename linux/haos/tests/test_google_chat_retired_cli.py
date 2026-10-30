@@ -67,3 +67,14 @@ def test_account_decision_uses_actual_worker_account_and_selected_snapshot(monke
     monkeypatch.setattr(cli.owner,method,lambda app,selected,note,**kw:calls.append((app,selected,note,kw)) or {'ok':True})
     assert cli.run(args(retired_action=action,profile=account['profile']))=={'ok':True}
     assert calls==[(account,row,'independent Owner review',{'confirmed':True})]
+
+
+def test_legacy_identity_cli_passes_only_explicit_original_public_metadata_and_owner_decision(monkeypatch):
+    from haos import initial_setup
+    monkeypatch.setattr(initial_setup,'require_root',lambda:None);calls=[]
+    selected=args(retired_action='restore-identity',profile='google-chat-'+'c'*64,id=None,snapshot_sha256=None)
+    selected.project_id='haos-fixture';selected.service_account_email='gateway@haos-fixture.iam.gserviceaccount.com';selected.bot_user='users/999'
+    monkeypatch.setattr(cli.owner,'restore_identity',lambda profile,identity,note,**kw:calls.append((profile,identity,note,kw)) or {'metadata':True})
+    assert cli.run(selected)=={'metadata':True}
+    assert calls==[(selected.profile,{'version':1,'project_id':selected.project_id,'service_account_email':selected.service_account_email,
+        'bot_user':selected.bot_user},'independent Owner review',{'confirmed':True})]

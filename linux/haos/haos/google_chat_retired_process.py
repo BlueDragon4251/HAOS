@@ -7,7 +7,7 @@ from .gateway_google_chat_identity import validate,account_scope
 from .gateway_google_chat_recovery import HEX,profile_name
 from .google_chat_owner_process import ERRORS,oauth_response,file_response,_snapshot,_name
 
-ACTIONS=frozenset({'profiles','tokens','revoke-token','quarantines','dispose-capsule','outputs','purge-output','unassociated-outputs','purge-unassociated-output'})
+ACTIONS=frozenset({'profiles','tokens','revoke-token','quarantines','dispose-capsule','outputs','purge-output','unassociated-outputs','purge-unassociated-output','restore-identity'})
 
 
 def _public_config():
@@ -74,6 +74,17 @@ def response(value,action,*,request=None,policy=None):
                 or value['active_authorization_returned'] is not False or value['app_association_inferred'] is not False):
             raise ValueError('global Owner cleanup cannot infer an app or return API authorization')
         file_response(value['result'],'outputs' if action=='unassociated-outputs' else 'output-purge','',request=request)
+        return value
+    if action=='restore-identity':
+        if set(value)!={'account','result','active_authorization_returned'} or value['active_authorization_returned'] is not False:
+            raise ValueError('identity repair cannot return active authorization')
+        identity=_identity(value['account']);result=value['result']
+        if (not isinstance(result,dict) or set(result)!={'profile','identity_sha256','receipt','public_identity_restored','network_requested','credentials_changed','private_credentials_returned'}
+                or result['profile']!=value['account']['profile'] or result['identity_sha256']!=digest(identity) or not _hash(result['receipt'])
+                or result['public_identity_restored'] is not True or any(result[k] is not False for k in ['network_requested','credentials_changed','private_credentials_returned'])):
+            raise ValueError('closed metadata-only identity repair receipt required')
+        if request is not None and (result['profile']!=request['profile'] or identity!=validate(request['identity'])):
+            raise ValueError('restored public identity differs from explicit original Owner metadata')
         return value
     if action=='profiles':
         if (set(value)!={'profiles','identity_missing','history_truncated','network_requested','private_credentials_returned'}
