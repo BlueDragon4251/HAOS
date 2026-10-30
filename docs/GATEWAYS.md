@@ -2,11 +2,12 @@
 
 The pinned Hermes catalog contains 22 adapters. Loading an upstream adapter is
 not HAOS integration or authorization. Current public HAOS text setup paths are
-Telegram, Discord, Slack, Mattermost, Matrix, ntfy, Home Assistant, IRC, LINE, SMS/Twilio, E-Mail, Feishu/Lark, DingTalk, A2A and Buzz.
+Telegram, Discord, Slack, Mattermost, Matrix, ntfy, Home Assistant, IRC, LINE, SMS/Twilio, E-Mail, Feishu/Lark, DingTalk, A2A, Buzz and Google Chat.
 Each uses the independent peer-authenticated mission queue, exact owner grants
 and its checked transport/delivery path. Unknown senders and plugins receive no
-automatic HAOS identity or owner rights. These fifteen software paths are not fifteen
-fully accepted platforms or a completed 22-gateway implementation.
+automatic HAOS identity or owner rights. These sixteen locally exercised software
+paths do not establish live account entitlement, external delivery or installed
+system/hardware acceptance, and do not complete the 22-gateway assignment.
 
 LINE additionally connects incoming PNG/JPEG/documents, isolated local voice
 transcription and MP4 file attachment, and separately approved outgoing
@@ -40,12 +41,17 @@ replies, separately approved media/local voice, root-controller exports,
 private upload custody and inspected account/source/history/reply recovery.
 See [Buzz setup and source-bound limits](GATEWAY-BUZZ.md).
 
-Google Chat private admission, native codec, SDK token, pre-ACK custody and
-bounded native text-write building blocks are being implemented; they remain
-outside public activation. See [current Google Chat scope](GATEWAY-GOOGLE-CHAT.md).
+Google Chat connects actual native SDK HTTP/PubSub reception and replies,
+independent numeric user/space/thread grants, durable originals and per-part
+outbox, local media/voice, private per-user file OAuth and sealed controller
+exports. The Owner GUI/CLI provides account/pairing and inspected source/file/
+token/quarantine recovery, original public identity repair, and recorded native
+status without stopping the service. Reconnect, replay, Root withdrawal and
+late-error terminal-state preservation have native/kernel coverage. See
+[Google Chat setup and source-specific acceptance](GATEWAY-GOOGLE-CHAT.md).
 
 The remaining HAOS integrations are
-google_chat, photon, raft, simplex, teams, wecom and whatsapp. Their bundled
+photon, raft, simplex, teams, wecom and whatsapp. Their bundled
 upstream modules alone do not count as working HAOS gateways. Complete each
 transport's owner provisioning, sender/chat/thread scopes, durable input/output,
 reconnect/replay/recovery, immediate revocation, audit, media and real GUI path

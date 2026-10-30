@@ -1,12 +1,16 @@
-# Google Chat — public path under software acceptance
+# Google Chat — local software acceptance
 
 Google Chat now has a dedicated graphical account/pairing page, Owner CLI,
 matched Root publication and a connection to the common gateway service. The
-accepted software count remains 15/22 while the remaining management/recovery
-checks and source-consistent acceptance are completed. Registry/GUI availability
-alone does not count as a completed integration. No installed-systemd or live
-Google Workspace acceptance is claimed. Sections below retain historical
-checkpoint evidence; their results apply to their recorded source revisions.
+locally validated software count is **16/22**. Account, exact-route grants,
+media/OAuth, retained custody/recovery and recorded status have real backends and
+local SDK/HTTP/gRPC/UID/GUI tests. This count does not claim installed-systemd or
+live Google Workspace acceptance. Sections below retain historical checkpoint
+evidence; their results apply to their recorded source revisions. The final
+source ledger distinguishes the broad baseline matrix from the terminal-state
+correction and its repeated regressions.
+
+Source ledger: [local software acceptance and exact-source CI snapshot](evidence/2026-10-30/google-chat-local-software-acceptance.json).
 
 ## Implemented private building blocks
 
@@ -80,18 +84,17 @@ again at dispatch. Actual-UID reopen tests keep one parent record, including a
 real SQL failure between parent commit and the source receipt. This proves the
 local relay handoff, not a root-controller mission or live inference.
 
-## Remaining acceptance
+## Account and installed-system acceptance
 
-- Finish native account/status management review and the remaining acceptance
-  checks. Original-identity restoration, known-identity token/quarantine/output
-  cleanup and global unassociated output cleanup are implemented below.
-- Finish source-consistent public-path validation and account/status management
-  review. Actual production-loop tests now cover both transports, Root policy,
-  separate controller Unix IPC, reconnect, replay and withdrawal.
-- Installed systemd/OS acceptance remains part of the system artifact phase.
-- Full source-consistent regression, kernel/process/GUI/build gates for that
-  public activation. Live Google account/consent/delivery acceptance stays
-  separate from the local SDK fixtures.
+- A real Google project, Workspace/Chat app access, expected bot membership,
+  topic/subscription/IAM or public HTTPS configuration and optional personal
+  OAuth consent are account/network prerequisites. Real external delivery and
+  entitlement remain untested; fixtures cannot establish them.
+- Installed systemd/OS/GUI and complete artifact acceptance remain part of the
+  system phase. Namespace tests run the actual production service and kernel
+  identities but do not boot an installed OS or attest a systemd credential mount.
+- GitHub CI results must be read against their exact source commit. Locally
+  passed gates do not turn queued/in-progress jobs into successful CI runs.
 
 ## Public account, policy and service path
 
