@@ -437,6 +437,21 @@ async def run():
             assert not await adapter.connect() and not adapter.is_connected
             expected='authentication-refused' if v['scenario']=='auth' else 'rate-limited'
             assert adapter.native_health()['status']==expected
+            if expected=='authentication-refused':
+                adapter._haos_google_delivery_error(ConnectionError('late transport completion fixture'))
+                assert adapter.native_health()['status']==expected
+                from haos.gateway_google_chat_http import TokenError
+                adapter._haos_google_delivery_error(TokenError('rate-limited',429,180,'late-budget-fixture'))
+                assert adapter.native_health()['status']==expected and adapter.native_health()['next_attempt']>=__import__('time').time()+175
+                import sqlite3
+                before=adapter.native_health();budget=list(inbox.db.execute('SELECT * FROM google_chat_profile_budget'))
+                inbox.db.execute("CREATE TRIGGER fail_profile_status BEFORE UPDATE ON google_chat_profile_status BEGIN SELECT RAISE(ABORT,'fixture status audit failure'); END")
+                try:
+                    try:adapter._haos_google_delivery_error(TokenError('rate-limited',429,240,'late-budget-failure-fixture'))
+                    except sqlite3.IntegrityError:pass
+                    else:raise AssertionError('failed atomic profile status update was ignored')
+                    assert adapter.native_health()==before and list(inbox.db.execute('SELECT * FROM google_chat_profile_budget'))==budget
+                finally:inbox.db.execute('DROP TRIGGER fail_profile_status')
             wait=adapter.native_health()['next_attempt']
             if v['scenario'] in {'rate','tokenrate'}:assert wait>=__import__('time').time()+175
             await adapter.disconnect();assert adapter.native_health()['next_attempt']>=wait
@@ -465,6 +480,7 @@ async def run():
         if not v['scenario'].startswith('pubsub'):adapter._haos_google_receiver.http_verifier.request=certificates
         print(json.dumps({'ready':True}),flush=True)
         restarted=False
+        late_revocation_checked=False
         while True:
             if v['scenario'].startswith('pubsub') and not restarted and (parent.parent/'reconnect').exists():
                 await adapter.disconnect();assert not adapter.is_connected
@@ -503,6 +519,9 @@ async def run():
                     # Match the production relay loop's revoked-publication
                     # handling. Unexpected errors under unchanged authority fail.
                     if publication.read_bytes()==initial:raise
+            if adapter.native_health()['status']=='revoked' and not late_revocation_checked:
+                adapter._haos_google_delivery_error(ConnectionError('late revoked transport completion fixture'))
+                assert adapter.native_health()['status']=='revoked';late_revocation_checked=True
             state={'status':adapter.native_health()['status'],'connected':adapter.is_connected,
                 'parent_records':relay.db.execute('SELECT COUNT(*) FROM inbox').fetchone()[0],
                 'restarted':restarted,'confirmed_outputs':inbox.db.execute("SELECT COUNT(*) FROM google_chat_delivery_groups WHERE state='confirmed'").fetchone()[0]}
@@ -529,7 +548,8 @@ asyncio.run(run())
     def token(change=None):return jwt.encode(signer,{**claims,**(change or {})}).decode()
     request={'value':value,'profile':str(profile),'policy':str(publication),'owner':str(owner),'caller_public':caller_public,'api_port':api_server.server_port,'pubsub_port':pubsub_port,'ca':str(ca_file),'scenario':scenario,'image':base64.b64encode(image).decode(),
         'controller_ipc':controller_ipc,'controller_database':str(directory/'controller-private/missions.sqlite'),'backend_url':'ws://127.0.0.1:1/explicit-not-inferred',
-        'production_serve':production_serve,'credential_directory':str(credential_directory),'reconnect':str(directory/'reconnect')}
+        'production_serve':production_serve,'credential_directory':str(credential_directory),'reconnect':str(directory/'reconnect'),
+        'media_revoke':media_revoke,'media_start':str(directory/'start-media')}
     env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8','PYTHONDONTWRITEBYTECODE':'1'};cases=[]
     for uid,groups in [(0,()),(65533,()),(65534,(0,))]:
         result=subprocess.run([str(runtime/'bin/python'),'-E','-s',str(driver)],input=json.dumps(request).encode(),capture_output=True,
@@ -592,6 +612,8 @@ async def main():
  print(json.dumps({'ready':True,'uid':os.geteuid()}),flush=True)
  async def dispatch_media():
   while not stop.is_set():
+   if v['media_revoke'] and not Path(v['media_start']).exists():
+    await asyncio.sleep(.01);continue
    row=store.claim()
    if row:
     if v['scenario']=='video':
@@ -736,9 +758,21 @@ asyncio.run(main())
                         return response.status,body
                 assert await send()==(200,b'{}')
                 if media_revoke:
+                    # Make the observer ready before real controller execution;
+                    # a fast real STT child must not finish before HTTP returns.
+                    Path(request['media_start']).write_text('Root observer ready for actual STT worker')
                     deadline=asyncio.get_running_loop().time()+10
                     while not speech_fixture.children():
-                        assert asyncio.get_running_loop().time()<deadline,'actual local STT worker must start before withdrawal'
+                        if asyncio.get_running_loop().time()>=deadline:
+                            diagnostic={'actual_STT_worker_not_observed':True,'speech_process_exit':speech_fixture.process.poll(),
+                                'backend_methods':[method for method,_ in backend_calls]}
+                            with sqlite3.connect(request['controller_database']) as db:
+                                diagnostic['missions']=db.execute('SELECT state,phase,substr(error,1,256) FROM missions LIMIT 4').fetchall()
+                            with sqlite3.connect(original_path) as db:
+                                diagnostic['originals']=db.execute('SELECT COUNT(*) FROM google_chat_originals').fetchone()[0]
+                                diagnostic['refusals']=db.execute('SELECT reason,COUNT(*) FROM google_chat_source_refusals GROUP BY reason').fetchall()
+                            from haos.redaction import Redactor
+                            raise AssertionError(Redactor([value['service_account']['private_key'],'local-profile-google-fixture-token']).clean(diagnostic))
                         await asyncio.sleep(.01)
                     workers=speech_fixture.children();assert workers
                     publish({**policy,'bindings':[]})

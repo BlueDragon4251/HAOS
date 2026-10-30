@@ -115,10 +115,22 @@ def _lifecycle(adapter,profile,lease,identity):
     def not_before():return db.execute('SELECT not_before FROM google_chat_profile_budget WHERE scope=?',(budget_scope,)).fetchone()[0]
     def status(state,delay=0):
         if state not in STATES:raise ValueError('finite Google Chat profile state required')
-        wait=max(not_before(),time.time()+delay if delay else 0)
-        db.execute('UPDATE google_chat_profile_budget SET not_before=? WHERE scope=?',(wait,budget_scope))
-        db.execute('UPDATE google_chat_profile_status SET status=?,updated_at=?,next_attempt=? WHERE identity=?',
-            (state,time.time(),wait,identity))
+        db.execute('BEGIN IMMEDIATE')
+        try:
+            wait=max(not_before(),time.time()+delay if delay else 0)
+            previous=db.execute('SELECT status FROM google_chat_profile_status WHERE identity=?',(identity,)).fetchone()
+            if previous is None:raise Conflict('Google profile status custody is missing; preserve and inspect')
+            # Late SDK callbacks cannot overwrite an auth block or Root
+            # withdrawal. Retain a newly observed retry deadline atomically.
+            # Explicit Owner recovery updates the blocked rows separately.
+            if previous['status'] in BLOCKS|{'revoked'}:state=previous['status']
+            db.execute('UPDATE google_chat_profile_budget SET not_before=? WHERE scope=?',(wait,budget_scope))
+            db.execute('UPDATE google_chat_profile_status SET status=?,updated_at=?,next_attempt=? WHERE identity=?',
+                (state,time.time(),wait,identity))
+            db.execute('COMMIT')
+        except BaseException:
+            if db.in_transaction:db.execute('ROLLBACK')
+            raise
     def health(self):
         result=dict(db.execute('SELECT connector,status,updated_at,next_attempt FROM google_chat_profile_status WHERE identity=?',(identity,)).fetchone())
         result['next_attempt']=max(result['next_attempt'],not_before());return result

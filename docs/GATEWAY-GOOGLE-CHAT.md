@@ -808,6 +808,25 @@ production transport variants and their kernel profile leases remain active.
 Additional SDK-free UID/SQLite/WAL/lease/filesystem probes cover missing data,
 credential isolation, preserved budgets and refusal of unsafe links/custody.
 
+## Terminal state and late SDK callbacks
+
+The broad native revocation check exposed a status race: a delivery error
+arriving during shutdown could overwrite `revoked` with `transport-unavailable`.
+The listener/real STT worker had stopped and no prompt was sent, but the recorded
+reason was incorrect. The status writer now preserves an existing Root
+withdrawal or sticky auth/identity block. A late rate-limit response still
+extends the stable account deadline. State and deadline commit in one FULL
+SQLite transaction; an actual SQLite trigger failure rolls both changes back.
+Explicit Owner recovery remains the way to release an auth block.
+
+Actual private-UID SDK fixtures exercise HTTP401 followed by late transport and
+rate callbacks, reopen without another auth request, and a real SQL update
+failure. The voice-withdrawal fixture additionally feeds a late delivery error
+after actual Root withdrawal. It synchronizes its Root observer with the fixture
+controller executor before the real STT child starts; it does not substitute the
+worker, extend deadlines, fake a PID or change production execution. The actual
+controller, speech socket, private worker and cancellation checks remain intact.
+
 The actual Root/private-UID process fixture removes only its disposable legacy
 marker after real SDK enrollment and removes all active connector/key/config
 data. Metadata restoration and subsequent historical inspection work with SDK
