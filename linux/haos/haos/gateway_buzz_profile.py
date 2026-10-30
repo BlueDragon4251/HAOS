@@ -52,7 +52,12 @@ def build(value,*,parent,connector,policy,inbox):
         except FileExistsError:pass
         _directory(home)
         from .redaction import Redactor
-        inbox.redactor=Redactor([*inbox.redactor.secrets,value['private_key'],value.get('auth_tag','')])
+        aliases=[value['private_key'],value.get('auth_tag','')]
+        if value.get('auth_tag'):
+            tag=json.loads(value['auth_tag']);aliases.extend([repr(tag),*[json.dumps(tag,ensure_ascii=ascii) for ascii in (True,False)]])
+        # Preserve the shared formatter/relay Redactor object. Replace its list
+        # atomically, so an existing logger iterator retains all previous aliases.
+        inbox.redactor.secrets=Redactor([*inbox.redactor.secrets,*aliases]).secrets
         environment={'HERMES_SAFE_MODE':'1','BUZZ_PRIVATE_KEY':value['private_key'],'BUZZ_RELAY_URL':value['relay_url'],
             'BUZZ_AUTH_TAG':value.get('auth_tag',''),'BUZZ_ALLOWED_USERS':','.join(sorted({row['sender'] for row in pinned().bindings.values() if row['connector']==connector})),
             'BUZZ_CHANNELS':','.join(value['channels']),'BUZZ_CLI_PATH':'/usr/lib/haos/buzz/buzz','BUZZ_REQUIRE_MENTION':'false',
@@ -83,7 +88,7 @@ def build(value,*,parent,connector,policy,inbox):
         adapter._haos_buzz_reader=reader;adapter._run_cli=reader.run
         # Include the native decoded scalar too when owner input used nsec.
         from plugins.platforms.buzz.nostr_auth import decode_private_key
-        inbox.redactor=Redactor([*inbox.redactor.secrets,format(decode_private_key(value['private_key']),'064x')]);reader.redactor=inbox.redactor
+        inbox.redactor.secrets=Redactor([*inbox.redactor.secrets,format(decode_private_key(value['private_key']),'064x')]).secrets
         originals=RawEvents(profile/'originals.db',inbox.redactor,current);adapter._haos_buzz_raw=originals
         async def original(channel,event):
             if channel is None:return False  # Membership is not an independent owner grant.
@@ -101,6 +106,9 @@ def _lifecycle(adapter,lease,identity):
     native=adapter._haos_native;db=native.inbox.db;value=adapter._haos_buzz_value
     reader=adapter._haos_buzz_reader;transport=adapter._haos_buzz_transport
     check=adapter._haos_buzz_check;scope=digest([native.connector,value]);lifecycle=asyncio.Lock()
+    from .gateway_buzz_delivery import Publisher
+    publisher=Publisher(adapter) if any(row['connector']==native.connector and 'read' in row['capabilities'] for row in native.policy().bindings.values()) else None
+    adapter._haos_buzz_publisher=publisher
     adapter._haos_buzz_monitor=None;adapter._haos_buzz_replay=None
     db.execute('''CREATE TABLE IF NOT EXISTS buzz_profile_status(identity TEXT PRIMARY KEY,connector TEXT NOT NULL,
         credential_scope TEXT NOT NULL,status TEXT NOT NULL,updated_at REAL NOT NULL,next_attempt REAL NOT NULL)''')
@@ -203,6 +211,7 @@ def _lifecycle(adapter,lease,identity):
                 check()
                 if transport.authentication_refused:raise QueryFailed('authentication_refused')
                 self._haos_buzz_replay=asyncio.create_task(recover())
+                with private_scope(self._haos_buzz_home,self._haos_buzz_environment):self._mark_connected()
                 status('connected-ws' if websocket else 'connected-poll');return True
             except asyncio.CancelledError:
                 await stop();raise
@@ -226,8 +235,22 @@ def _lifecycle(adapter,lease,identity):
         async with lifecycle:
             if self._haos_buzz_closed:return
             await stop();self._haos_buzz_closed=True
+            if publisher is not None:await publisher.close()
             self._haos_buzz_history.close();self._haos_buzz_raw.close();os.close(lease)
             if health(self)['status'] not in BLOCKS|{'revoked'}:status('closed')
-    for name,method in {'connect':connect,'disconnect':disconnect,'_haos_close':close,'_haos_health':health}.items():
+    async def send(self,chat_id,content,reply_to=None,metadata=None):
+        from .gateway_delivery_authority import current_delivery
+        authority=current_delivery(self,'buzz',chat_id,metadata)
+        if publisher is None:raise PermissionError('creation-only Buzz profile has no reply authority')
+        binding=native.policy().current_binding(metadata['haos_binding'])
+        prepared=metadata.get('haos_output')
+        if prepared is not None:
+            if (not isinstance(prepared,dict) or set(prepared)!={'items','text'} or not isinstance(prepared['items'],list)
+                    or not isinstance(prepared['text'],str) or prepared['items']):
+                raise PermissionError('Buzz media output requires its private sealed implementation')
+            content=prepared['text']
+        return await publisher.send(binding,metadata.get('haos_delivery_id'),metadata.get('haos_delivery_attempt'),content,reply_to,authority)
+    for name,method in {'connect':connect,'disconnect':disconnect,'_haos_close':close,'_haos_health':health,
+            'close_profile':close,'native_health':health,'send':send}.items():
         setattr(adapter,name,MethodType(method,adapter))
     return adapter

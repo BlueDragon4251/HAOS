@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import socket
 import ssl
+import struct
 import subprocess
 import sys
 import tempfile
@@ -49,6 +50,19 @@ def main():
                 if mode['name']=='redirect':return web.Response(status=302,headers={'Location':origin+'/escape'})
                 if request.path=='/query':
                     if mode['name']=='malformed-history':return web.Response(text='not a JSON array',content_type='application/json')
+                    if mode['name']=='invalid-encoding':return web.Response(body=b'\xff',content_type='application/json')
+                    if mode['name']=='oversized-error':return web.Response(status=400,body=b'x'*65537)
+                    if mode['name']=='invalid-auth-body':return web.Response(status=401,body=b'\xff')
+                    if mode['name']=='oversized-header':
+                        response=web.StreamResponse(headers={'Content-Length':str(8*1024*1024+1)})
+                        await response.prepare(request);return response
+                    if mode['name']=='oversized-chunks':
+                        response=web.StreamResponse();await response.prepare(request)
+                        try:
+                            for _ in range(129):await response.write(b'x'*65536)
+                            await response.write_eof()
+                        except ConnectionResetError:pass
+                        return response
                     queries.append(json.loads(raw));return web.json_response([read_event] if mode['name']=='cursor' else [profile])
                 event=json.loads(raw);verified(event);writes.append(raw)
                 assert event['kind']==9 and event['pubkey']==public and ['h','01234567-89ab-4cde-8012-3456789abcde'] in event['tags']
@@ -61,10 +75,11 @@ def main():
             runner=web.AppRunner(app,access_log=None);await runner.setup()
             tls=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);tls.load_cert_chain(root/'certificate.pem',root/'key.pem')
             await web.TCPSite(runner,'127.0.0.1',port,ssl_context=tls).start()
-            async def run(args,text=None,before_id=None):
+            async def run(args,text=None,before_id=None,approval=None):
                 env={'PATH':'/usr/bin:/bin','HOME':str(root),'LANG':'C.UTF-8','BUZZ_RELAY_URL':origin,'BUZZ_PRIVATE_KEY':scalar,
                     'BUZZ_OUTPUT_FORMAT':'json','BUZZ_TIMEOUT_SECS':'2','BUZZ_CONNECT_TIMEOUT_SECS':'2','SSL_CERT_FILE':str(root/'ca.pem')}
                 if before_id is not None:env['HAOS_BUZZ_BEFORE_ID']=before_id
+                if approval is not None:env['HAOS_BUZZ_APPROVAL_SOCKET']=approval
                 process=await asyncio.create_subprocess_exec(str(cli),*args,stdin=asyncio.subprocess.PIPE if text is not None else asyncio.subprocess.DEVNULL,
                     stdout=asyncio.subprocess.PIPE,stderr=asyncio.subprocess.PIPE,env=env)
                 try:out,err=await asyncio.wait_for(process.communicate(None if text is None else text.encode()),20)
@@ -112,6 +127,62 @@ def main():
                 code,out,err=await run(read_args);assert code==4 and not out,(code,out,err)
                 assert json.loads(err)['message']=='invalid history response'
                 cases.append('malformed_successful_HTTP_history_is_an_explicit_native_CLI_error_not_an_empty_complete_history')
+                for name in ['oversized-header','oversized-chunks']:
+                    mode['name']=name;before=len(calls)
+                    code,out,err=await run(read_args)
+                    assert code==4 and not out and json.loads(err)['message']=='response_limit',(code,out,err)
+                    assert len(calls)==before+1
+                cases.append('actual_native_HTTP_reader_refuses_over_8MiB_declared_or_chunked_bodies_before_JSON_allocation_and_without_retry_or_empty_history')
+                mode['name']='oversized-error';before=len(calls)
+                code,out,err=await run(read_args)
+                assert code==2 and not out and json.loads(err)['message']=='relay error 400: response_limit',(code,out,err)
+                assert len(calls)==before+1
+                cases.append('actual_native_HTTP_error_body_limit_preserves_status_without_unbounded_body_or_read_retry')
+                mode['name']='invalid-auth-body';before=len(calls)
+                code,out,err=await run(read_args)
+                assert code==3 and not out and json.loads(err)['message']=='relay error 401: authentication refused',(code,out,err)
+                assert len(calls)==before+1
+                cases.append('actual_definite_401_refuses_before_opaque_body_parsing_even_when_body_is_invalid_UTF8_without_retry_or_false_network_failure')
+                mode['name']='invalid-encoding'
+                code,out,err=await run(read_args)
+                assert code==4 and not out and json.loads(err)['message']=='invalid response encoding',(code,out,err)
+                cases.append('actual_native_JSON_query_refuses_invalid_UTF8_without_lossy_replacement_or_fake_empty_history')
+                mode['name']='ok';approval_name='haos-buzz-'+os.urandom(32).hex()
+                observed=asyncio.Event();allowed=asyncio.Event();guard_mode={'name':'allow'};guarded=[];guard_errors=[]
+                async def approve(reader,writer):
+                    try:
+                        async with asyncio.timeout(10):
+                            pid,uid,gid=struct.unpack('3i',writer.get_extra_info('socket').getsockopt(socket.SOL_SOCKET,socket.SO_PEERCRED,12))
+                            assert pid>0 and uid==os.geteuid() and gid==os.getegid()
+                            size=int.from_bytes(await reader.readexactly(4),'big');assert 0<size<=1048576
+                            raw=await reader.readexactly(size);event=json.loads(raw);verified(event)
+                            assert event['pubkey']==public and event['kind']==9 and ['h','01234567-89ab-4cde-8012-3456789abcde'] in event['tags']
+                            guarded.append(raw)
+                            if guard_mode['name']=='allow':
+                                with (root/'retained-signed-event.json').open('xb') as stream:
+                                    stream.write(raw);stream.flush();os.fsync(stream.fileno())
+                                observed.set();await allowed.wait();writer.write(b'\x01');await writer.drain()
+                            elif guard_mode['name']=='deny':writer.write(b'\x00');await writer.drain()
+                            else:assert guard_mode['name']=='drop'
+                    except BaseException as error:guard_errors.append(type(error).__name__)
+                    finally:writer.close();await writer.wait_closed()
+                guard=await asyncio.start_unix_server(approve,path='\0'+approval_name)
+                try:
+                    count=len(writes);operation=asyncio.create_task(run(args,'Locally approved signed original',approval=approval_name))
+                    await asyncio.wait_for(observed.wait(),10)
+                    assert len(writes)==count and not operation.done()
+                    retained=(root/'retained-signed-event.json').read_bytes();assert retained==guarded[-1]
+                    allowed.set();code,out,err=await operation;assert code==0 and len(writes)==count+1,(code,out,err)
+                    assert writes[-1]==retained and json.loads(out)['event_id']==json.loads(retained)['id']
+                    cases.append('actual_native_signed_message_blocks_before_HTTP_until_private_peer_checked_bounded_event_is_fsynced_and_explicitly_approved_then_submits_exact_original_bytes_and_id')
+                    for choice in ['deny','drop']:
+                        guard_mode['name']=choice;count=len(writes)
+                        code,out,err=await run(args,'Locally refused '+choice,approval=approval_name)
+                        assert code==4 and not out and json.loads(err)['message']=='private event approval refused',(code,out,err)
+                        assert len(writes)==count
+                    assert len(guarded)==3 and not guard_errors
+                    cases.append('actual_native_prepublication_refusal_and_approval_channel_disconnect_never_submit_signed_message_or_fallback_to_unguarded_send')
+                finally:guard.close();await guard.wait_closed()
                 mode['name']='drop';writes.clear()
                 code,out,err=await run(args,'Ambiguous local message');assert code!=0 and len(writes)==3,(code,out,err)
                 assert writes[0]==writes[1]==writes[2] and len(set(auth_ids[-3:]))==3

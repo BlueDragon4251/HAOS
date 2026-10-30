@@ -189,3 +189,44 @@ These are private component/profile and local parent-relay receipts. The public
 runtime factory, root controller mission flow, outputs, media/voice, owner GUI,
 recovery decisions, image packaging and CI wiring remain unfinished. Buzz is
 still not counted as the fifteenth completed gateway.
+
+## Signed outbound custody and private outbox (still not public)
+
+The reviewed CLI overlay now bounds actual HTTP response headers/chunks before
+JSON allocation (8 MiB success, 64 KiB error), rejects invalid UTF-8, and refuses
+definite 401/403 before parsing an opaque response body. Native read retry and
+NIP-98 signing remain intact. Fifteen actual CLI/TLS cases pass, including the
+size/encoding limits and a private prepublication handshake.
+
+The actual native message builder/signature is retained. Before submission, a
+scoped Unix socket sends at most 1 MiB of its signed event to the private gateway
+process and requires an explicit one-byte acknowledgment. The gateway checks the
+real CLI peer PID/UID/GID, verifies the actual official SDK signature, checks the
+sealed body/channel/thread/recipient/resource choices, and commits the signed
+original before acknowledging. Denial or disconnect before acknowledgment never
+falls back to unguarded publication. Output, environment, process deadline,
+current authority checks and process-group cleanup are bounded.
+
+The private Publisher now binds an exact outbox attempt to a committed original
+input and the current independent read/reply grant. It invokes the actual pinned
+`BuzzAdapter.send`, permitting only one native write with the approved target;
+native mention fallbacks cannot launch an extra publication. Confirmed attempts
+return their existing event ID. A crash or lost local acceptance commit leaves
+an uncertain attempt; it never automatically starts a new signing process.
+
+An inspected stopped-profile recovery decision uses a current grant, exact
+snapshot, explicit non-delivery confirmation and an audit record. An approved
+next attempt reuses the retained signed event through an actually sealed memfd.
+The native SDK verifies the inherited event and keeps its timestamp, signature,
+content and ID; the same prepublication checks still apply. This private helper
+is not yet wired to the public owner UID/CLI/GUI handoff.
+
+Twenty-seven actual UID/CLI/WSS/history/profile/outbox cases pass. They include a
+real SQL failure when saving acceptance after the fixture relay accepted the
+event, fresh-process uncertainty with no automatic resend, refusal of a stale
+owner inspection, idempotent recovery authorization and exact signed replay
+through actual `BuzzAdapter.send`. The fixture relay checks committed signed
+bytes before accepting HTTP. These are local relay acceptance receipts; they
+do not prove recipient reads, live external delivery or full controller/owner
+handoff integration. Minimal/full regressions each pass 2,551 tests with the same
+two existing skips. Buzz remains private at 14/22 public software gateways.

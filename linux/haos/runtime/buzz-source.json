@@ -24,5 +24,8 @@
   "messages_original_sha256": "8c5ff2a85a92f1b726fa00d5ee416b4707fccf616394bff7e4bad5c122ee1243",
   "bounded_query_cursor_extension": "HAOS_BUZZ_BEFORE_ID",
   "history_parser": "cmd_get_messages rejects invalid response JSON instead of substituting an empty list",
+  "HTTP_response_body_limits": {"success":8388608,"error":65536,"encoding":"strict UTF-8","scope":"actual CLI handle_response header and decoded chunk bounds"},
+  "prepublish_guard": "HAOS_BUZZ_APPROVAL_SOCKET-v1: bounded signed original plus one-byte approval before native message submission",
+  "signed_replay": "HAOS_BUZZ_REPLAY_FD-v1: bounded SDK-verified original from inherited descriptor, exact own identity, same prepublication guard, no new signature",
   "maximum_glibc": "2.36"
 }

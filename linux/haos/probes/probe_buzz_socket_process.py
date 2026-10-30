@@ -34,15 +34,19 @@ def main():
         provenance['programs'][name]['sha256']=hashlib.sha256((target/name).read_bytes()).hexdigest()
     (target/'source.json').write_text(json.dumps(provenance));(target/'source.json').chmod(0o644)
     sys.path[:0]=[str(code),str(code/'hermes-source'),'/sdk','/repo/linux/haos/runtime']
-    guard='''from haos.gateway_buzz_profile import build
-try:build(None,parent=None,connector=None,policy=None,inbox=None)
-except PermissionError:print('refused-before-optional-SDK')
-else:raise AssertionError('foreign UID entered private Buzz profile')
+    guard='''import asyncio
+from haos.gateway_buzz_profile import build
+from haos.gateway_buzz_send_process import send
+for action in [lambda:build(None,parent=None,connector=None,policy=None,inbox=None),
+    lambda:asyncio.run(send(None,None,home=None,current=None,retain=None,redactor=None))]:
+    try:action()
+    except PermissionError:print('refused-before-optional-SDK')
+    else:raise AssertionError('foreign UID entered private Buzz profile or sender')
 '''
     for uid,gid,groups in [(0,0,[]),(65533,65533,[]),(65534,65534,[0])]:
         result=subprocess.run([sys.executable,'-c',guard],user=uid,group=gid,extra_groups=groups,
             env={'PATH':'/usr/bin:/bin','PYTHONPATH':str(code)},capture_output=True,text=True,timeout=5)
-        assert result.returncode==0 and result.stdout=='refused-before-optional-SDK\n' and not result.stderr
+        assert result.returncode==0 and result.stdout=='refused-before-optional-SDK\n'*2 and not result.stderr
     from webhook_tls_fixture import create
     from plugins.platforms.buzz import nostr_auth
     from haos.gateway_buzz import scope
@@ -68,13 +72,15 @@ from pathlib import Path
 from types import MethodType,SimpleNamespace
 from haos.gateway_runtime import require_runtime_identity,prepare_runtime_home
 require_runtime_identity();prepare_runtime_home()
-from haos.gateway import digest
+from haos.gateway import digest,Conflict
 from haos.gateway_buzz import PreparedBuzzPolicy,scope
 from haos.gateway_buzz_crypto import verify
 from haos.gateway_buzz_cli import Reader,QueryFailed
 from haos.gateway_buzz_history import History
 from haos.gateway_buzz_ingress import install as install_ingress,capture as capture_ingress,dispatch_stored
 from haos.gateway_buzz_profile import build as build_profile
+from haos.gateway_buzz_send_process import send as private_send
+from haos.gateway_buzz_recovery import outgoing as inspect_outgoing,approve_retry
 from haos.gateway_buzz_socket import Transport
 from haos.gateway_buzz_cache import RawEvents
 from haos.gateway_buzz_admission import Refused
@@ -134,6 +140,67 @@ adapter.send_reaction=no_reaction
 transport=Transport(value,current,capture);adapter._open_websocket=transport.open
 async def exercise():
     try:
+        if sys.argv[1].startswith('outbox'):
+            profiles=base/'outbox-profiles';profiles.mkdir(mode=0o700,exist_ok=True)
+            local=NativeInbox(base/'outbox-native.db',redactor);parent=RelayInbox(base/'outbox-parent.db',redactor)
+            profile=None
+            def build():
+                result=build_profile(value,parent=profiles,connector='buzz',policy=current,inbox=local)
+                from haos.gateway_runtime import adapter_envelope
+                def admit(event):parent.admit(current(),'buzz',adapter_envelope(event,'buzz'));return True
+                result.set_durable_message_handler(admit);result.set_message_handler(admit);return result
+            source=json.loads(Path(sys.argv[2]).read_text())['original']['id']
+            case='outbox-receipt-fail' if sys.argv[1] in {'outbox-receipt-fail','outbox-receipt-reopen','outbox-owner-retry'} else sys.argv[1]
+            delivery=digest(['local Buzz outbox fixture',case]);content='Private local fixture '+case
+            binding=current().bindings['owner']
+            metadata={'haos_binding':{'binding_id':binding['id'],'binding_digest':digest(binding)},'haos_scope':scope(value),
+                'thread_id':'','haos_delivery_id':delivery,'haos_delivery_attempt':1}
+            try:
+                profile=build();assert await profile.connect() and profile.is_connected
+                async with asyncio.timeout(20):
+                    while not local.db.execute("SELECT 1 FROM native_inbox WHERE message_id=? AND state='committed'",(source,)).fetchone():await asyncio.sleep(.05)
+                if sys.argv[1]=='outbox-receipt-fail':
+                    local.db.execute("CREATE TRIGGER fail_outbox_receipt BEFORE UPDATE ON buzz_delivery_intents WHEN NEW.state='confirmed' BEGIN SELECT RAISE(ABORT,'fixture confirmed receipt failure'); END")
+                if sys.argv[1]=='outbox-owner-retry':
+                    await profile.close_profile();profile=None
+                    row=next(row for row in inspect_outgoing(local) if row['delivery_id']==delivery)
+                    request={'connector':'buzz','delivery_id':delivery,'attempt':1,'snapshot_sha256':row['snapshot_sha256'],
+                        'owner_uid':1000,'note_sha256':digest('explicit fixture owner non-delivery inspection'),'confirmed':True,'confirmed_not_delivered':True}
+                    try:approve_retry(local,current(),{**request,'snapshot_sha256':'0'*64})
+                    except Conflict:pass
+                    else:raise AssertionError('stale owner inspection authorized retry')
+                    first=approve_retry(local,current(),request);assert first['signed_event_reuse_required'] is True
+                    assert approve_retry(local,current(),request)==first
+                    profile=build();assert await profile.connect() and profile.is_connected
+                    metadata['haos_delivery_attempt']=2
+                receipt=await profile.send(value['channels'][0],content,reply_to=source,metadata=metadata)
+                if sys.argv[1]=='outbox-receipt-fail':local.db.execute('DROP TRIGGER fail_outbox_receipt')
+                repeated=await profile.send(value['channels'][0],content,reply_to=source,metadata=metadata)
+                assert repeated.success==receipt.success and repeated.message_id==receipt.message_id
+                row=local.db.execute('SELECT * FROM buzz_delivery_intents WHERE delivery_id=? ORDER BY attempt DESC',(delivery,)).fetchone()
+                print(json.dumps({'success':receipt.success,'state':row['state'],'event_id':row['event_id'],
+                    'receipt':receipt.message_id,'attempt':row['attempt'],'actual_native_send':True}),flush=True)
+            finally:
+                if profile is not None:await profile.close_profile()
+                local.close();parent.close()
+            return
+        if sys.argv[1].startswith('outgoing'):
+            fixture=json.loads(Path(sys.argv[2]).read_text());source=fixture['original']
+            target={'channel':value['channels'][0],'anchor':source['id'],'thread':source['id'],
+                'content':'Private local fixture '+sys.argv[1],'kind':9,'allowed_mentions':[source['pubkey'],value['public_key']],'explicit_mentions':[]}
+            inbox.db.execute('CREATE TABLE IF NOT EXISTS buzz_outgoing_probe(id TEXT PRIMARY KEY,data BLOB NOT NULL)')
+            replay=None
+            if sys.argv[1]=='outgoing-replay':
+                target['content']='Private local fixture outgoing-drop'
+                replay=bytes(inbox.db.execute("SELECT data FROM buzz_outgoing_probe WHERE json_extract(CAST(data AS TEXT),'$.content')=?",(target['content'],)).fetchone()[0])
+            async def retained(raw,event):
+                current()
+                if sys.argv[1]=='outgoing-refuse':return False
+                inbox.db.execute('INSERT OR IGNORE INTO buzz_outgoing_probe VALUES(?,?)',(event['id'],raw))
+                assert inbox.db.execute('SELECT data FROM buzz_outgoing_probe WHERE id=?',(event['id'],)).fetchone()[0]==raw
+                return True
+            result=await private_send(value,target,home=base,current=current,retain=retained,redactor=redactor,replay=replay)
+            print(json.dumps(result),flush=True);return
         if sys.argv[1] in {'profile','profile-auth','profile-auth-saved'}:
             profiles=base/'profiles';profiles.mkdir(mode=0o700,exist_ok=True)
             private_inbox=NativeInbox(base/'profile-native.db',redactor);private_parent=RelayInbox(base/'profile-parent.db',redactor)
@@ -153,6 +220,7 @@ async def exercise():
                     assert profile._haos_health()['status']=='authentication-refused'
                     print(json.dumps({'profile_authentication_refused':True}),flush=True);return
                 assert await profile.connect(),profile._haos_health()
+                assert profile.is_connected
                 assert profile._haos_health()['status']=='connected-ws'
                 async with asyncio.timeout(20):
                     while private_parent.db.execute('SELECT COUNT(*) FROM inbox').fetchone()[0]<2:await asyncio.sleep(.05)
@@ -165,6 +233,7 @@ async def exercise():
                 async with asyncio.timeout(5):
                     while profile._haos_buzz_transport.connections or profile._ws_task is not None:await asyncio.sleep(.05)
                 assert profile._ws_task is None
+                assert not profile.is_connected
                 print(json.dumps({'profile_revoked':True,'native_socket_stopped':True}),flush=True)
             finally:await profile._haos_close();private_inbox.close();private_parent.close()
             return
@@ -244,7 +313,6 @@ async def exercise():
             else:raise AssertionError('invalid query result accepted')
         if sys.argv[1]=='storage':
             import sqlite3
-            from haos.gateway import Conflict
             fixture=json.loads(Path(sys.argv[2]).read_text());count=originals.db.execute('SELECT COUNT(*) FROM buzz_raw_events').fetchone()[0]
             proof=await originals.capture(current(),'buzz',value,json.dumps(fixture['original']).encode())
             same=await originals.capture(current(),'buzz',value,json.dumps(fixture['alternate']).encode())
@@ -338,19 +406,34 @@ except PermissionError as error:
     cases=['actual_root_agent_UID_and_gateway_with_supplementary_root_group_are_refused_before_optional_native_SDK_import_or_credential_parsing_in_private_profile_factory']
     async def exercise():
         from aiohttp import web
-        mode={'name':'receive'};auths=[];subscriptions=[];escapes=[];active=[];queries=[];query_auth=[]
+        mode={'name':'receive'};auths=[];subscriptions=[];escapes=[];active=[];queries=[];query_auth=[];outgoing=[];write_auth=[]
         def verified(event):
             result=subprocess.run([str(target/'haos-buzz-verify')],input=json.dumps(event),text=True,capture_output=True,timeout=5)
             assert result.returncode==0 and json.loads(result.stdout)['valid'] is True
         async def handle(request):
-            if request.path=='/query':
+            if request.path in {'/query','/events'}:
                 body=await request.read();header=request.headers['Authorization'];assert header.startswith('Nostr ')
                 auth=json.loads(base64.b64decode(header[6:],validate=True));verified(auth)
                 tags={tag[0]:tag[1] for tag in auth['tags'] if len(tag)==2}
-                assert auth['kind']==27235 and auth['pubkey']==public and tags['u']==value['relay_url']+'/query'
+                assert auth['kind']==27235 and auth['pubkey']==public and tags['u']==value['relay_url']+request.path
                 assert tags['method']=='POST' and tags['payload']==hashlib.sha256(body).hexdigest()
+                if request.path=='/events':
+                    import sqlite3
+                    original=json.loads(body);verified(original);assert original['pubkey']==public
+                    expected='outgoing-drop' if mode['name']=='outgoing-replay' else 'outbox-receipt-fail' if mode['name']=='outbox-owner-retry' else mode['name']
+                    assert ['h',channel] in original['tags'] and original['content']=='Private local fixture '+expected
+                    if mode['name'].startswith('outbox'):
+                        with sqlite3.connect('file:'+str(private/'outbox-native.db')+'?mode=ro',uri=True) as check:
+                            assert check.execute("SELECT signed_raw FROM buzz_delivery_intents WHERE event_id=? AND state='writing'",(original['id'],)).fetchone()[0]==body
+                    else:
+                        with sqlite3.connect('file:'+str(private/'native.db')+'?mode=ro',uri=True) as check:
+                            assert check.execute('SELECT data FROM buzz_outgoing_probe WHERE id=?',(original['id'],)).fetchone()[0]==body
+                    outgoing.append(body);write_auth.append(auth['id'])
+                    if mode['name']=='outgoing-drop':request.transport.close();return web.Response()
+                    return web.json_response({'event_id':original['id'],'accepted':True})
                 selection=json.loads(body);queries.append(selection);query_auth.append(auth['id'])
                 assert isinstance(selection,list) and len(selection)==1
+                if selection[0].get('ids')==[event['id']]:return web.json_response([event])
                 if mode['name'] in {'reader-auth','profile-auth'}:return web.json_response({'error':'not channel members '+scalar},status=401)
                 if mode['name']=='reader-rate':return web.json_response({'error':'rate limited fixture'},status=429)
                 if mode['name']=='reader-reflect':return web.json_response([signed(scalar,json.dumps({'display_name':scalar}),0)])
@@ -380,7 +463,7 @@ except PermissionError as error:
             if mode['name']=='auth-refuse':await socket.close();return socket
             first=await socket.receive_json();second=await socket.receive_json();subscriptions.extend([first,second])
             assert first[0]=='REQ' and first[2]['#h']==[channel] and second[2]['#p']==[public]
-            if mode['name'] in {'receive','profile'}:
+            if mode['name'] in {'receive','profile'} or mode['name'].startswith('outbox'):
                 await socket.send_json(['EVENT',first[1],unknown]);await socket.send_json(['EVENT',first[1],event]);await socket.send_json(['EVENT',first[1],event])
             async for message in socket:
                 if message.type==web.WSMsgType.TEXT:subscriptions.append(json.loads(message.data))
@@ -412,6 +495,20 @@ except PermissionError as error:
                 if name=='reader-rate':
                     assert queries[-3:]==[queries[-1]]*3 and len(set(query_auth[-3:]))==3
             cases.append('actual_official_CLI_auth_refusal_is_sticky_without_retry_or_empty_history_and_reflected_private_material_or_wrong_public_identity_never_reaches_native_adapter')
+            for name,expected,count in [('outgoing-ok','confirmed',1),('outgoing-refuse','not-dispatched',0),('outgoing-drop','uncertain',3)]:
+                mode['name']=name;before=len(outgoing);process=spawn(name)
+                result=await line(process);assert result['state']==expected,result
+                assert result['error']==(None if expected=='confirmed' else 'prepublication-refused' if expected=='not-dispatched' else 'delivery-unknown')
+                await done(process);assert len(outgoing)==before+count
+                if count==1:assert result['receipt']==json.loads(outgoing[-1])['id']
+                if count==3:assert outgoing[-3:]==[outgoing[-1]]*3 and len(set(write_auth[-3:]))==3 and result['receipt'] is None
+            cases.append('actual_gateway_UID_fixed_CLI_peer_PID_SDK_verification_and_FULL_signed_original_commit_precede_HTTP_publication_and_exact_native_reply_receipt')
+            cases.append('actual_private_signed_original_custody_refusal_never_publishes_and_post_ack_body_disconnect_retries_only_same_event_then_reports_uncertain_without_new_process_or_resigning')
+            before=len(outgoing);previous=outgoing[-1];await asyncio.sleep(2)
+            mode['name']='outgoing-replay';process=spawn('outgoing-replay');result=await line(process)
+            assert result=={'state':'confirmed','receipt':json.loads(previous)['id'],'error':None};await done(process)
+            assert len(outgoing)==before+1 and outgoing[-1]==previous
+            cases.append('fresh_gateway_UID_process_replays_exact_retained_signed_original_through_sealed_memfd_and_actual_native_SDK_verification_without_new_timestamp_signature_or_event_identity')
             mode['name']='receive'
             process=spawn('receive');assert await line(process)=={'ready':True,'uid':65534}
             result=await line(process);assert result=={'received':[event['id']],'captured':[event['id'],event['id']],'raw_count':1,'native_count':1,'relay_count':1},result
@@ -437,6 +534,17 @@ except PermissionError as error:
             mode['name']='history-malformed';process=spawn('history-malformed')
             assert await line(process)=={'malformed_failed':True,'raw_count':123};await done(process)
             cases.append('actual_native_CLI_rejects_malformed_HTTP_history_without_false_empty_list_or_completed_sweep_and_saved_cursor_remains_unchanged')
+            for name,state,count in [('outbox-ok','confirmed',1),('outbox-receipt-fail','uncertain',1),('outbox-receipt-reopen','uncertain',0),('outbox-owner-retry','confirmed',1)]:
+                mode['name']=name;before=len(outgoing);process=spawn(name);result=await line(process);await done(process)
+                assert result['state']==state and result['success'] is (state=='confirmed'),result
+                assert result['actual_native_send'] is True and len(outgoing)==before+count
+                if name=='outbox-ok':assert result['receipt']==result['event_id'] and result['attempt']==1
+                if name=='outbox-receipt-fail':retained_original=outgoing[-1];assert result['receipt'] is None
+                if name=='outbox-receipt-reopen':assert result['event_id']==json.loads(retained_original)['id']
+                if name=='outbox-owner-retry':assert result['attempt']==2 and outgoing[-1]==retained_original and result['receipt']==json.loads(retained_original)['id']
+            cases.append('actual_native_BuzzAdapter_send_runs_only_behind_current_independent_source_and_outbox_authority_and_repeated_confirmed_attempt_returns_same_receipt_without_HTTP')
+            cases.append('actual_SQL_acceptance_commit_failure_reopens_uncertain_and_never_automatically_republishes_or_signs_new_id_for_same_outbox_attempt')
+            cases.append('stopped_private_profile_owner_inspection_rejects_stale_snapshot_then_idempotent_approved_next_attempt_replays_identical_signed_event_through_actual_native_send_and_new_UID_process')
             mode['name']='receive'
             for action,expected in [('decode-receipt-fail',{'native_state':'committed','parent_count':3,'handler_calls':1,'raw_receipt':False}),
                     ('decode-receipt-recover',{'native_state':'committed','parent_count':3,'handler_calls':0,'raw_receipt':True}),
